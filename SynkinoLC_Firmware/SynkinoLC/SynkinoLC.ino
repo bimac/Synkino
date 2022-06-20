@@ -25,30 +25,35 @@ Bounce2::Button button = Bounce2::Button();
 
 void setup(void) {
 
-  Serial.begin(115200);
+  Serial.begin(9600);
+  Serial.printf("Welcome to %s\n",uCVersion);
 
   // set HW SPI pins (in case we go for alternative pins)
   SPI.setMOSI(SPI_MOSI);
   SPI.setMISO(SPI_MISO);
   SPI.setSCK(SPI_SCK);
 
-  // set pin mode
-  pinMode(BUZZER, OUTPUT);
-  // pinMode(ENCODER_A, INPUT_PULLUP);
-  // pinMode(ENCODER_B, INPUT_PULLUP);
-  // pinMode(ENCODER_BTN, INPUT_PULLUP);
-
+  // set u8g2 and display boot splash
   u8g2.begin();
-  u8g2.setFont(u8g2_font_helvR10_tr);
   u8g2.firstPage();
   do {
     u8g2.drawXBMP(logo_xbm_x, logo_xbm_y, logo_xbm_width, logo_xbm_height, logo_xbm_bits);
   } while (u8g2.nextPage());
+  u8g2.setFont(u8g2_font_helvR10_tr);
   delay(2000);
 
-  myState = MAIN_MENU;
+  // set pin mode
+  pinMode(BUZZER, OUTPUT);
 
-  // restoreLastProjectorUsed();
+  // initialize SD
+  SD.begin(CARD_CS);
+
+  // initialize VS1053
+  musicPlayer.begin();
+  musicPlayer.useInterrupt(VS1053_FILEPLAYER_PIN_INT);
+  patchVS1053();
+  musicPlayer.setVolume(20, 20);
+  musicPlayer.startPlayingFile("/track001.mp3");
 
   button.attach(ENCODER_BTN, INPUT_PULLUP);
   button.setPressedState(LOW);
@@ -57,11 +62,9 @@ void setup(void) {
   enc.begin(ENCODER_A, ENCODER_B, CountMode::half, INPUT_PULLUP);
   enc.attachCallback([](int position, int delta) { lastActivityMillies = millis(); });
 
-  musicPlayer.begin();
-  musicPlayer.setVolume(20, 20);
-  SD.begin(CARD_CS);
-  musicPlayer.useInterrupt(VS1053_FILEPLAYER_PIN_INT);
-  musicPlayer.startPlayingFile("/track001.mp3");
+  myState = MAIN_MENU;
+  restoreLastProjectorUsed();
+  tone(BUZZER, 6000, 30); // Hello!
 }
 
 void loop(void) {
@@ -114,7 +117,7 @@ void loop(void) {
       myState = SELECT_TRACK;
       break;
     case MENU_ITEM_POWER_OFF:
-      // shutdownSelf();
+      shutdownSelf();
       break;
     case MENU_ITEM_EXTRAS:
       extrasMenuSelection = u8g2.userInterfaceSelectionList("Extras", MENU_ITEM_DEL_EEPROM, extras_menu);
@@ -587,13 +590,48 @@ void printASCII(char * buffer) {
   }
 }
 
-void showError(char *errorHeader, char *errorMsg1, char *errorMsg2) {
+void shutdownSelf() {
+  // digitalWrite(AUDIO_EN, LOW);
+  // digitalWrite(POWER_OFF, LOW);
+  u8g2.firstPage();
+  do {
+    u8g2.setFont(u8g2_font_helvR10_tr);
+    u8g2.setCursor(25,35);
+    u8g2.print("Good Bye.");
+  } while ( u8g2.nextPage() );
+  playGoodBye();
+  delay(1000);
+  u8g2.setPowerSave(1);
+
+  // delay(20000);   // If still alive after 20 seconds, we are powered by serial port
+  // do {
+  //   lastActivityMillies = millis();   // just to prevent the Power-Down ISR from firing when uC is powered by serial port
+  //   delay (20000);                    // Safe some Power
+  // } while(true);
+}
+
+void showError(const char* errorHeader, const char* errorMsg1, const char* errorMsg2) {
   u8g2.setFont(u8g2_font_helvR08_tr);
   u8g2.setFontRefHeightAll(); // this will add some extra space for the text inside the buttons
   u8g2.userInterfaceMessage(errorHeader, errorMsg1, errorMsg2, " Okay ");
   waitForBttnRelease();
   u8g2.setFont(u8g2_font_helvR10_tr);
   u8g2.setFontRefHeightText();
+}
+
+void restoreLastProjectorUsed() {
+  lastProjectorUsed = EEPROM.read(1);
+  if ((lastProjectorUsed > 8) || lastProjectorUsed == 0) {    // If EEPROM contains 00 or FF here, contents doesn't look legit
+    for (int i = 0 ; i < EEPROM.length() ; i++) {
+      EEPROM.write(i, 0);
+    }
+    lastProjectorUsed = EEPROM.read(1);
+    gatherProjectorData();
+    saveProjector(NEW);
+
+  } else {
+    loadProjectorConfig(lastProjectorUsed);
+  }
 }
 
 void playClick() {
@@ -615,4 +653,22 @@ void playGoodBye() {
   tone(BUZZER, 3136, 200); // G7
   delay(200);
   tone(BUZZER, 2093, 500); // C7
+}
+
+bool patchVS1053() {
+  if (!SD.exists("/patches.053"))
+    return false;
+
+  Serial.print("Applying \"patches.053\" ... ");
+  File file = SD.open("/patches.053", O_READ);
+  uint16_t size = file.size();
+  uint8_t patch[size];
+  bool success = file.read(&patch, size) == size;
+  file.close();
+  if (success) {
+    musicPlayer.applyPatch(reinterpret_cast<uint16_t*>(patch), size/2);
+    Serial.print("done.");
+  } else
+    Serial.print("error reading file.");
+  return success;
 }
