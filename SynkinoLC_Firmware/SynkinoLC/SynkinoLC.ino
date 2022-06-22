@@ -49,9 +49,11 @@ void setup(void) {
   SD.begin(CARD_CS);
 
   // initialize VS1053
-  musicPlayer.begin();
-  musicPlayer.useInterrupt(VS1053_FILEPLAYER_PIN_INT);
+  Serial.println("Initializing VS1053 ...");
+  if (!musicPlayer.begin())
+    showError("ERROR", "Could not initialize", "VS1053B Breakout");
   patchVS1053();
+  musicPlayer.useInterrupt(VS1053_FILEPLAYER_PIN_INT);
   musicPlayer.setVolume(20, 20);
   musicPlayer.startPlayingFile("/track001.mp3");
 
@@ -658,7 +660,6 @@ void playGoodBye() {
 bool patchVS1053() {
   if (!SD.exists("/patches.053"))
     return false;
-
   Serial.print("Applying \"patches.053\" ... ");
   File file = SD.open("/patches.053", O_READ);
   uint16_t size = file.size();
@@ -667,8 +668,8 @@ bool patchVS1053() {
   file.close();
   if (success) {
     musicPlayer.applyPatch(reinterpret_cast<uint16_t*>(patch), size/2);
-    Serial.print("done.");
+    Serial.println("done.");
   } else
-    Serial.print("error reading file.");
+    Serial.println("error reading file.");
   return success;
 }
