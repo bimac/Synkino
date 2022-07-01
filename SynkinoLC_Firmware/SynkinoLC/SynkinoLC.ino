@@ -8,6 +8,7 @@ const char *uCVersion = "SynkinoLC v1.0\n";
 #include <SPI.h>
 #include <U8g2lib.h>
 #include <EEPROM.h>
+#include <incbin.h>
 
 #include "menus.h"  // menu definitions, positions of menu items
 #include "pins.h"   // pin definitions
@@ -15,6 +16,9 @@ const char *uCVersion = "SynkinoLC v1.0\n";
 #include "time.h"   // useful time constants and macros
 #include "vars.h"   // initialization of constants and vars
 #include "xbm.h"    // XBM graphics
+
+// Include binaries
+INCBIN(Patches, "patches.053");
 
 // Initialize Objects
 Adafruit_VS1053_FilePlayer musicPlayer(VS1053_RST, VS1053_CS, VS1053_DCS, VS1053_DREQ, CARD_CS);
@@ -52,7 +56,8 @@ void setup(void) {
   Serial.println("Initializing VS1053 ...");
   if (!musicPlayer.begin())
     showError("ERROR", "Could not initialize", "VS1053B Breakout");
-  patchVS1053();
+  Serial.printf("Applying \"patches.053\" (%d bytes)\n\n",gPatchesSize);
+  musicPlayer.applyPatch(reinterpret_cast<const uint16_t*>(gPatchesData), gPatchesSize/2);
   musicPlayer.useInterrupt(VS1053_FILEPLAYER_PIN_INT);
   musicPlayer.setVolume(20, 20);
   musicPlayer.startPlayingFile("/track001.mp3");
@@ -655,21 +660,4 @@ void playGoodBye() {
   tone(BUZZER, 3136, 200); // G7
   delay(200);
   tone(BUZZER, 2093, 500); // C7
-}
-
-bool patchVS1053() {
-  if (!SD.exists("/patches.053"))
-    return false;
-  Serial.print("Applying \"patches.053\" ... ");
-  File file = SD.open("/patches.053", O_READ);
-  uint16_t size = file.size();
-  uint8_t patch[size];
-  bool success = file.read(&patch, size) == size;
-  file.close();
-  if (success) {
-    musicPlayer.applyPatch(reinterpret_cast<uint16_t*>(patch), size/2);
-    Serial.println("done.");
-  } else
-    Serial.println("error reading file.");
-  return success;
 }
