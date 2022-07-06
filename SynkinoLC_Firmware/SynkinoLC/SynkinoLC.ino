@@ -655,20 +655,20 @@ void playClick() {
 }
 
 void playConfirm() {
-  tone(BUZZER, 2093,  50); // C7
+  tone(BUZZER, NOTE_C7, 50);
   delay(50);
-  tone(BUZZER, 3136,  50); // G7
+  tone(BUZZER, NOTE_G7, 50);
   delay(50);
-  tone(BUZZER, 4186,  50); // C8
+  tone(BUZZER, NOTE_C8, 50);
 }
 
 void playGoodBye() {
   delay(250);
-  tone(BUZZER, 4186, 200); // C8
+  tone(BUZZER, NOTE_C8, 200);
   delay(200);
-  tone(BUZZER, 3136, 200); // G7
+  tone(BUZZER, NOTE_G7, 200);
   delay(200);
-  tone(BUZZER, 2093, 500); // C7
+  tone(BUZZER, NOTE_C7, 500);
 }
 
 bool patchVS1053() {
