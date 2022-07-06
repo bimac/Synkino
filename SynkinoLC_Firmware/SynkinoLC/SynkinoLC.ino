@@ -24,7 +24,8 @@ const char *uCVersion = "SynkinoLC v1.0\n";
 
 // Initialize Objects
 Adafruit_VS1053_FilePlayer musicPlayer(VS1053_RST, VS1053_CS, VS1053_DCS, VS1053_DREQ, CARD_CS);
-U8G2_SSD1306_128X64_NONAME_1_4W_HW_SPI u8g2(U8G2_R0, OLED_CS, OLED_DC, OLED_RST);
+//U8G2_SSD1306_128X64_NONAME_1_4W_HW_SPI u8g2(U8G2_R0, OLED_CS, OLED_DC, OLED_RST);
+U8G2_SH1106_128X64_NONAME_F_4W_HW_SPI u8g2(U8G2_R0, OLED_CS, OLED_DC, OLED_RST);
 using namespace EncoderTool;
 Encoder enc;
 Bounce2::Button button = Bounce2::Button();
@@ -39,20 +40,27 @@ void setup(void) {
   SPI.setMISO(SPI_MISO);
   SPI.setSCK(SPI_SCK);
 
-  // set u8g2 and display boot splash
-  u8g2.begin();
-  u8g2.firstPage();
-  do {
-    u8g2.drawXBMP(logo_xbm_x, logo_xbm_y, logo_xbm_width, logo_xbm_height, logo_xbm_bits);
-  } while (u8g2.nextPage());
-  u8g2.setFont(u8g2_font_helvR10_tr);
-  delay(2000);
+  pinMode(OLED_CS, OUTPUT);
+  digitalWriteFast(OLED_CS, HIGH);
+  delay(1);
 
   // set pin mode
   pinMode(BUZZER, OUTPUT);
 
+  // display boot splash
+  u8g2.begin();
+  u8g2.drawXBMP(logo_xbm_x, logo_xbm_y, logo_xbm_width, logo_xbm_height, logo_xbm_bits);
+  u8g2.sendBuffer();
+  delay(1000);
+  u8g2.drawXBMP(logolc_xbm_x, logolc_xbm_y, logolc_xbm_width, logolc_xbm_height, logolc_xbm_bits);
+  u8g2.drawXBMP(ifma_xbm_x, ifma_xbm_y, ifma_xbm_width, ifma_xbm_height, ifma_xbm_bits);
+  u8g2.sendBuffer();
+  delay(1000);
+  u8g2.setFont(u8g2_font_helvR10_tr);
+
   // initialize SD
-  SD.begin(CARD_CS);
+  if (!SD.begin(CARD_CS))
+    showError("ERROR", "Could not initialize", "SD card");
 
   // initialize VS1053
   Serial.println("Initializing VS1053 ...");
