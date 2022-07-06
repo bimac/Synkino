@@ -8,7 +8,12 @@ const char *uCVersion = "SynkinoLC v1.0\n";
 #include <SPI.h>
 #include <U8g2lib.h>
 #include <EEPROM.h>
-#include <incbin.h>
+
+// Add patches.053 to flash? Not possible with TeensyLC. See platformio.ini ...
+#ifdef INC_PATCHES
+  #include <incbin.h>
+  INCBIN(Patch, "patches.053");
+#endif
 
 #include "menus.h"  // menu definitions, positions of menu items
 #include "pins.h"   // pin definitions
@@ -16,9 +21,6 @@ const char *uCVersion = "SynkinoLC v1.0\n";
 #include "time.h"   // useful time constants and macros
 #include "vars.h"   // initialization of constants and vars
 #include "xbm.h"    // XBM graphics
-
-// Include binaries
-INCBIN(Patches, "patches.053");
 
 // Initialize Objects
 Adafruit_VS1053_FilePlayer musicPlayer(VS1053_RST, VS1053_CS, VS1053_DCS, VS1053_DREQ, CARD_CS);
@@ -56,8 +58,7 @@ void setup(void) {
   Serial.println("Initializing VS1053 ...");
   if (!musicPlayer.begin())
     showError("ERROR", "Could not initialize", "VS1053B Breakout");
-  Serial.printf("Applying \"patches.053\" (%d bytes)\n\n",gPatchesSize);
-  musicPlayer.applyPatch(reinterpret_cast<const uint16_t*>(gPatchesData), gPatchesSize/2);
+  patchVS1053();
   musicPlayer.useInterrupt(VS1053_FILEPLAYER_PIN_INT);
   musicPlayer.setVolume(20, 20);
   musicPlayer.startPlayingFile("/track001.mp3");
@@ -660,4 +661,33 @@ void playGoodBye() {
   tone(BUZZER, 3136, 200); // G7
   delay(200);
   tone(BUZZER, 2093, 500); // C7
+}
+
+bool patchVS1053() {
+  if (SD.exists("/patches.053")) {
+    // If patches.053 is found on SD we'll always try to load it from there ...
+    File file = SD.open("/patches.053", O_READ);
+    uint16_t size = file.size();
+    uint8_t patch[size];
+    Serial.printf("Applying \"patches.053\" (%d bytes) from SD card ... ", size);
+    bool success = file.read(&patch, size) == size;
+    file.close();
+    if (success) {
+      musicPlayer.applyPatch(reinterpret_cast<uint16_t*>(patch), size/2);
+      Serial.println("done.");
+      return success;
+    } else
+      Serial.println("error reading file.");
+  }
+  else {
+    // ... if not, we'll load it from flash memory
+    #ifdef INC_PATCHES
+    Serial.printf("Applying \"patches.053\" (%d bytes) from flash ... ", gPatchSize);
+    musicPlayer.applyPatch(reinterpret_cast<const uint16_t*>(gPatchData), gPatchSize/2);
+    Serial.printf("done.\n\n");
+    return true;
+    #endif
+    // ... this, however, won't be possible for low-memory MCUs like TeensyLC
+    return false;
+  }
 }
