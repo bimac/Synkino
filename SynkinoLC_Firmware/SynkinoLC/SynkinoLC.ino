@@ -21,6 +21,7 @@ const char *uCVersion = "SynkinoLC v1.0\n";
 #include "time.h"   // useful time constants and macros
 #include "vars.h"   // initialization of constants and vars
 #include "xbm.h"    // XBM graphics
+#include "notes.h"  // buzzer frequencies
 
 // Initialize Objects
 Adafruit_VS1053_FilePlayer musicPlayer(VS1053_RST, VS1053_CS, VS1053_DCS, VS1053_DREQ, CARD_CS);
