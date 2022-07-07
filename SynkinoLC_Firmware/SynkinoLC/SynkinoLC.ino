@@ -1,14 +1,14 @@
 const char *uCVersion = "SynkinoLC v1.0\n";
 
-#include <Adafruit_VS1053.h>
 #include <Arduino.h>
+#include <Adafruit_VS1053.h>
 #include <EncoderTool.h>
 #include <SD.h>
 #include <SPI.h>
 #include <U8g2lib.h>
 #include <EEPROM.h>
 
-// Add patches.053 to flash? Not possible with TeensyLC. See platformio.ini ...
+// Add patches.053 to flash? Not possible with TeensyLC.
 #ifdef INC_PATCHES
   #include <incbin.h>
   INCBIN(Patch, "patches.053");
@@ -28,10 +28,14 @@ Adafruit_VS1053_FilePlayer musicPlayer(VS1053_RST, VS1053_CS, VS1053_DCS, VS1053
 U8G2_SH1106_128X64_NONAME_1_4W_HW_SPI u8g2(U8G2_R0, OLED_CS, OLED_DC, OLED_RST);
 using namespace EncoderTool;
 PolledEncoder enc;
+IntervalTimer encTimer;
 IntervalTimer dimmingTimer;
 
 #define DISPLAY_DIM_AFTER   5000
 #define DISPLAY_BLANK_AFTER 600000
+
+#define FONT10 u8g2_font_helvR10_tr
+#define FONT08 u8g2_font_helvR08_tr
 
 void setup(void) {
 
@@ -63,7 +67,7 @@ void setup(void) {
 
   u8g2.sendBuffer();
   delay(2000);
-  u8g2.setFont(u8g2_font_helvR10_tr);
+  u8g2.setFont(FONT10);
 
   // initialize SD
   Serial.println("Initializing SD card ...");
@@ -85,6 +89,7 @@ void setup(void) {
   enc.begin(ENCODER_A, ENCODER_B, ENCODER_BTN, CountMode::half, INPUT_PULLUP);
   enc.attachCallback([](int position, int delta) { lastActivityMillies = millis(); });
   enc.attachButtonCallback([](int state) { lastActivityMillies = millis(); });
+  encTimer.begin([]() { enc.tick(); }, 200);
 
   // initialize timer for dimming the display
   dimmingTimer.begin(dimDisplay, 1000000);
@@ -94,7 +99,6 @@ void setup(void) {
 
   // Say "Hello!"
   playHello();
-  delay(500);
   Serial.println("Startup complete.\n");
 }
 
@@ -114,9 +118,8 @@ void loop(void) {
         if (projectorCount < 8) {
           gatherProjectorData();
           saveProjector(NEW);
-        } else {
+        } else
           showError("ERROR", "Too many Projectors.","Only 8 allowed.");
-        }
         break;
       case MENU_ITEM_SELECT:
         makeProjectorSelectionMenu();
@@ -169,7 +172,7 @@ void loop(void) {
     trackChosen = selectTrackScreen();
     if (trackChosen != 0) {
       //tellAudioPlayer(CMD_LOAD_TRACK, trackChosen);
-      myState = WAIT_FOR_LOADING;
+      myState = MAIN_MENU;//WAIT_FOR_LOADING;
     } else {
       myState = MAIN_MENU;
     }
@@ -254,7 +257,6 @@ void deleteProjector(byte thisProjector) {
 void saveProjector(byte thisProjector) {
   byte projectorCount;
   projectorCount = EEPROM.read(0);
-  //  Serial.println(projectorCount);
 
   Projector aProjector;
   aProjector.shutterBladeCount = shutterBladesMenuSelection;
@@ -333,62 +335,38 @@ byte makeProjectorSelectionMenu() {
 }
 
 void waitForBttnRelease() {
-  do
-    enc.tick();
-  while (!enc.getButton());
+  while (!enc.getButton()) {}
 }
 
 uint16_t selectTrackScreen() {
-  // int parentMenuEncPosition = myEnc.read();
-  // int newEncPosition = 0;
-  // int oldPosition = 0;
-  // if (encType == 30) {
-  //   myEnc.write(16002);
-  // } else {
-  //   myEnc.write(16001);
-  // }
-
-  // waitForBttnRelease();
-  // delay(30);  // very very poor an's debounce
-
-  // while (digitalRead(ENCODER_BTN) == 1) {     // adjust ### as long as button not pressed
-  //   newEncPosition = myEnc.read();
-  //   if (encType == 30) {
-  //     newEncPosition = (newEncPosition >> 1) % 1000;
-  //   } else {
-  //     newEncPosition = (newEncPosition >> 2) % 1000;
-  //   }
-  //   if (newEncPosition != oldPosition) {
-  //     Serial.print(F("Enc: "));
-  //     Serial.println(newEncPosition);
-
-  //     oldPosition = newEncPosition;
-  //     playClick();
-
-  //     u8g2.firstPage();
-
-  //     if (newEncPosition == 0) {
-  //       do {
-  //         u8g2.setFont(u8g2_font_helvR10_tr);
-  //         u8g2.drawStr(18,35,"< Main Menu");
-  //       } while ( u8g2.nextPage() );
-  //     } else {
-  //       do {
-  //         u8g2.setFont(u8g2_font_inb46_mn);
-  //         u8g2.setCursor(9, 55);
-  //         if (newEncPosition < 10)  u8g2.print("0");
-  //         if (newEncPosition < 100) u8g2.print("0");
-  //         u8g2.print(newEncPosition);
-  //       } while ( u8g2.nextPage() );
-  //     }
-  //   }
-  // }
-  // waitForBttnRelease();
-  // oldPosition = 0;
-  // myEnc.write(parentMenuEncPosition);
-  // u8g2.setFont(u8g2_font_helvR10_tr);   // Only until we go to the PLAYING_MENU here
-  // return newEncPosition;
-  return 0;
+  static uint16_t trackNo = 1;
+  enc.setValue(1);
+  enc.setLimits(0,999);
+  while (enc.getButton()) {
+    if (enc.valueChanged()) {
+      trackNo = enc.getValue();
+      playClick();
+      u8g2.firstPage();
+      if (trackNo == 0) {
+        do {
+          u8g2.setFont(FONT10);
+          u8g2.drawStr(18,35,"< Main Menu");
+        } while ( u8g2.nextPage() );
+      } else {
+        do {
+          u8g2.setFont(u8g2_font_inb46_mn);
+          u8g2.setCursor(9, 55);
+          if (trackNo <  10) u8g2.print("0");
+          if (trackNo < 100) u8g2.print("0");
+          u8g2.print(trackNo);
+        } while ( u8g2.nextPage() );
+      }
+    }
+  }
+  waitForBttnRelease();
+  enc.setLimits(-999,999);
+  u8g2.setFont(FONT10);
+  return trackNo;
 }
 
 void handleProjectorNameInput() {
@@ -426,8 +404,6 @@ void handleProjectorNameInput() {
   while (charIndex < maxProjectorNameLength && !inputFinished) {
 
     while (enc.getButton()) {
-      enc.tick();
-
       newEncPosition = enc.getValue();
 
       if (newEncPosition != oldEncPosition) {
@@ -460,7 +436,6 @@ void handleProjectorNameInput() {
 
     lastMillis = millis();
     while (!enc.getButton() && !inputFinished) {
-      enc.tick();
       if (!tonePlayedYet) {
         tone(BUZZER, 4000, 5);
         tonePlayedYet = true;
@@ -469,7 +444,6 @@ void handleProjectorNameInput() {
       inputFinished = handleStringInputGraphically(JUST_PRESSED, newEncPosition, lastMillis, firstUse, false);
     }
     while (!enc.getButton() && inputFinished) {
-      enc.tick();
       handleStringInputGraphically(LONG_PRESSED, newEncPosition, 0, firstUse, false);
     }
 
@@ -495,7 +469,7 @@ void handleProjectorNameInput() {
 bool handleStringInputGraphically(byte action, char localChar, unsigned long lastMillis, bool firstUse, bool charChanged) {
   u8g2.firstPage();
   do {
-    u8g2.setFont(u8g2_font_helvR10_tr);
+    u8g2.setFont(FONT10);
     u8g2.setCursor(15, 35);
     u8g2.print(newProjectorName);
 
@@ -506,13 +480,13 @@ bool handleStringInputGraphically(byte action, char localChar, unsigned long las
         else if (localChar == 127) { // Delete
           u8g2.setFont(u8g2_font_m2icon_9_tf);
           u8g2.print("a"); // https://github.com/olikraus/u8g2/wiki/fntpic/u8g2_font_m2icon_9_tf.png
-          u8g2.setFont(u8g2_font_helvR10_tr);
+          u8g2.setFont(FONT10);
         } else {
           u8g2.print(localChar);
         }
       }
 
-      u8g2.setFont(u8g2_font_helvR08_tr);
+      u8g2.setFont(FONT08);
       if (localChar == 32) {
         u8g2.drawStr(45, 55, "[Space]");
       } else if (localChar == 127) {
@@ -527,7 +501,7 @@ bool handleStringInputGraphically(byte action, char localChar, unsigned long las
     }
 
     else if (action == JUST_PRESSED) {
-      u8g2.setFont(u8g2_font_helvR08_tr);
+      u8g2.setFont(FONT08);
       u8g2.drawStr(11, 55, "[Keep pressed to Save]");
       if (millis() - lastMillis > 1500) {
         playConfirm();
@@ -536,11 +510,11 @@ bool handleStringInputGraphically(byte action, char localChar, unsigned long las
     }
 
     else if (action == LONG_PRESSED) {
-      u8g2.setFont(u8g2_font_helvR08_tr);
+      u8g2.setFont(FONT08);
       u8g2.drawStr(41, 55, "[Saved!]");
     }
     u8g2.drawStr(19, 14, "Set Projector Name");
-    u8g2.setFont(u8g2_font_helvR10_tr);
+    u8g2.setFont(FONT10);
   } while (u8g2.nextPage());
 
   return false;
@@ -548,8 +522,6 @@ bool handleStringInputGraphically(byte action, char localChar, unsigned long las
 
 // This overwrites the weak function in u8x8_debounce.c
 uint8_t u8x8_GetMenuEvent(u8x8_t *u8x8) {
-
-    enc.tick();                       // update encoder
     int encVal = enc.getValue();      // get encoder value
     enc.setValue(0);                  // reset encoder
 
@@ -566,9 +538,7 @@ uint8_t u8x8_GetMenuEvent(u8x8_t *u8x8) {
     } else if (!enc.getButton()) {
       dimDisplay();                   // wake up display
       tone(BUZZER, 4000, 5);
-      do
-        enc.tick();
-      while (!enc.getButton());
+      while (!enc.getButton()) {}
       return U8X8_MSG_GPIO_MENU_SELECT;
 
     } else
@@ -626,16 +596,14 @@ void e2reader() {
   Serial.println();
 }
 
-void printASCII(char * buffer) {
-  for(int i = 0; i < 16; i++){
-    if(i == 8)
+void printASCII(char *buffer) {
+  for (int i = 0; i < 16; i++) {
+    if (i == 8)
       Serial.print(" ");
-
-    if(buffer[i] > 31 and buffer[i] < 127){
+    if (buffer[i] > 31 and buffer[i] < 127)
       Serial.print(buffer[i]);
-    }else{
+    else
       Serial.print(F("."));
-    }
   }
 }
 
@@ -651,17 +619,14 @@ void showError(const char* errorHeader, const char* errorMsg1, const char* error
 
 void restoreLastProjectorUsed() {
   lastProjectorUsed = EEPROM.read(1);
-  if ((lastProjectorUsed > 8) || lastProjectorUsed == 0) {    // If EEPROM contains 00 or FF here, contents doesn't look legit
-    for (int i = 0 ; i < EEPROM.length() ; i++) {
+  if (lastProjectorUsed > 8 || lastProjectorUsed == 0) {    // If EEPROM contains 00 or FF here, contents doesn't look legit
+    for (int i = 0; i < EEPROM.length(); i++)
       EEPROM.write(i, 0);
-    }
     lastProjectorUsed = EEPROM.read(1);
     gatherProjectorData();
     saveProjector(NEW);
-
-  } else {
+  } else
     loadProjectorConfig(lastProjectorUsed);
-  }
 }
 
 void playClick() {
@@ -715,17 +680,16 @@ bool patchVS1053() {
 }
 
 uint8_t userInterfaceMessage(const char *title1, const char *title2, const char *title3, const char *buttons) {
-  u8g2.setFont(u8g2_font_helvR08_tr);
+  u8g2.setFont(FONT08);
   u8g2.setFontRefHeightAll();
   uint8_t out = u8g2.userInterfaceMessage(title1, title2, title3, buttons);
-  u8g2.setFont(u8g2_font_helvR10_tr);
+  u8g2.setFont(FONT10);
   u8g2.setFontRefHeightText();
   return out;
 }
 
 void dimDisplay() {
   static uint8_t state = 99;
-
   if (state == 0 && millis() - lastActivityMillies > DISPLAY_DIM_AFTER) {
     u8g2.setContrast(1);
     state = 1;
