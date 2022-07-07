@@ -233,6 +233,14 @@ void deleteProjector(byte thisProjector) {
   byte projectorCount;
   projectorCount = EEPROM.read(0);
   Projector aProjector;
+
+  EEPROM.get((projectorSelectionMenuSelection - 1) * sizeof(aProjector), aProjector);
+  char name[maxProjectorNameLength + 2] = "\"";
+  strcat(name, aProjector.name);
+  strcat(name, "\"");
+  if (u8g2.userInterfaceMessage("Delete projector", name, "Are you sure?", " Cancel \n Yes ") == 1)
+    return;
+
   if (thisProjector == projectorCount) {
     Serial.print("Zeroing out (in theory): #");
     Serial.println(thisProjector);
