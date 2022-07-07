@@ -15,14 +15,12 @@
 //
 #define MENU_ITEM_PROJECTOR       1
 #define MENU_ITEM_SELECT_TRACK    2
-#define MENU_ITEM_POWER_OFF       3
-#define MENU_ITEM_EXTRAS          4
+#define MENU_ITEM_EXTRAS          3
 
 #define MENU_ITEM_NEW             1
 #define MENU_ITEM_SELECT          2
 #define MENU_ITEM_EDIT            3
 #define MENU_ITEM_DELETE          4
-#define MENU_ITEM_EXIT            5
 
 #define MENU_ITEM_NAME            1
 #define MENU_ITEM_SHUTTER_BLADES  2
@@ -52,7 +50,6 @@
 const char *main_menu =
   "Projector\n"
   "Select Track\n"
-  "Power Off\n"
   "Extras";
 
 const char *projector_action_menu =
