@@ -14,6 +14,7 @@
 #define VS1053_DCS      20  // VS1053 Data/command select pin (output)
 #define VS1053_DREQ      3  // VS1053 Data request, ideally an Interrupt pin
 #define CARD_CS         21  // SD Card chip select pin
+#define CARD_DET        19  // SD Card detection
 
 #define ENCODER_A        5
 #define ENCODER_B        6

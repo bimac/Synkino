@@ -50,6 +50,7 @@ void setup(void) {
   // set pin mode
   pinMode(BUZZER, OUTPUT);
   pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(CARD_DET, INPUT_PULLUP);
 
   // initialize u8g2 / display boot splash
   u8g2.begin();
@@ -69,8 +70,17 @@ void setup(void) {
   delay(2000);
   u8g2.setFont(FONT10);
 
+  // initialize encoder
+  Serial.println("Initializing encoder ...");
+  enc.begin(ENCODER_A, ENCODER_B, ENCODER_BTN, CountMode::half, INPUT_PULLUP);
+  enc.attachCallback([](int position, int delta) { lastActivityMillies = millis(); });
+  enc.attachButtonCallback([](int state) { lastActivityMillies = millis(); });
+  encTimer.begin([]() { enc.tick(); }, 200);
+
   // initialize SD
   Serial.println("Initializing SD card ...");
+  while (!digitalRead(CARD_DET))
+    showError("ERROR", "Please insert", "SD card");
   if (!SD.begin(CARD_CS))
     showError("ERROR", "Could not initialize", "SD card");
 
@@ -83,13 +93,6 @@ void setup(void) {
   musicPlayer.useInterrupt(VS1053_FILEPLAYER_PIN_INT);
   musicPlayer.setVolume(20, 20);
   musicPlayer.startPlayingFile("/track001.mp3");
-
-  // initialize encoder
-  Serial.println("Initializing encoder ...");
-  enc.begin(ENCODER_A, ENCODER_B, ENCODER_BTN, CountMode::half, INPUT_PULLUP);
-  enc.attachCallback([](int position, int delta) { lastActivityMillies = millis(); });
-  enc.attachButtonCallback([](int state) { lastActivityMillies = millis(); });
-  encTimer.begin([]() { enc.tick(); }, 200);
 
   // initialize timer for dimming the display
   dimmingTimer.begin(dimDisplay, 1000000);
