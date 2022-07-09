@@ -550,15 +550,6 @@ uint8_t u8x8_GetMenuEvent(u8x8_t *u8x8) {
 
 void e2reader() {
   char buffer[16];
-  char valuePrint[4];
-  byte value;
-  unsigned int address;
-  uint8_t trailingSpace = 2;
-
-  for (address = 0; address <= 127; address++) {
-    // read a byte from the current address of the EEPROM
-    value = EEPROM.read(address);
-
   for (uint8_t address = 0; address <= 127; address += 16){
     EEPROM.get(address, buffer);                                      // get data from EEPROM
     Serial.printf("\n 0x%05X:  ", address);                           // print address
@@ -566,8 +557,6 @@ void e2reader() {
       Serial.printf((i % 8 > 0) ? "%02X " : "%02X   ", buffer[i-1]);  // print HEX values
     printASCII(buffer);
   }
-  for (int i = trailingSpace; i > 0; i--)
-
   Serial.println("");                                                 // final new line
 }
 
