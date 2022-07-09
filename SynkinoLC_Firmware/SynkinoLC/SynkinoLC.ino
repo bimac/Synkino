@@ -559,44 +559,16 @@ void e2reader() {
     // read a byte from the current address of the EEPROM
     value = EEPROM.read(address);
 
-    // add space between two sets of 8 bytes
-    if (address % 8 == 0)
-      Serial.print(F("  "));
-
-    // newline and address for every 16 bytes
-    if (address % 16 == 0) {
-      // print the buffer
-      if (address > 0 && address % 16 == 0)
-        printASCII(buffer);
-
-      sprintf(buffer, "\n 0x%05X: ", address);
-      Serial.print(buffer);
-
-      // clear the buffer for the next data block
-      memset(buffer, 32, 16);
-    }
-
-    // save the value in temporary storage
-    buffer[address % 16] = value;
-
-    // print the formatted value
-    sprintf(valuePrint, " %02X", value);
-    Serial.print(valuePrint);
+  for (uint8_t address = 0; address <= 127; address += 16){
+    EEPROM.get(address, buffer);                                      // get data from EEPROM
+    Serial.printf("\n 0x%05X:  ", address);                           // print address
+    for (uint8_t i = 1; i <= 16; i++)
+      Serial.printf((i % 8 > 0) ? "%02X " : "%02X   ", buffer[i-1]);  // print HEX values
+    printASCII(buffer);
   }
-
-  if (address % 16 > 0) {
-    if (address % 16 < 9)
-      trailingSpace += 2;
-
-    trailingSpace += (16 - address % 16) * 3;
-  }
-
   for (int i = trailingSpace; i > 0; i--)
-    Serial.print(F(" "));
 
-  // last line of data and a new line
-  printASCII(buffer);
-  Serial.println();
+  Serial.println("");                                                 // final new line
 }
 
 void printASCII(char *buffer) {
