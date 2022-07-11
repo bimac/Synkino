@@ -41,8 +41,9 @@
 #define MENU_ITEM_EXIT            3
 
 #define MENU_ITEM_VERSION         1
-#define MENU_ITEM_DEL_EEPROM      2
-#define MENU_ITEM_DUMP            3
+#define MENU_ITEM_TEST_IMPULSE    2
+#define MENU_ITEM_DEL_EEPROM      3
+#define MENU_ITEM_DUMP            4
 
 
 // ---- Define structure of menus --------------------------------------------------
@@ -78,5 +79,6 @@ const char *trackLoaded_menu =
 
 const char *extras_menu =
   "Version\n"
+  "Test Impulse\n"
   "Del EEPROM\n"
   "Dump EEPROM";
