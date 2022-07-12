@@ -89,3 +89,17 @@
 #define NOTE_CS8 4435
 #define NOTE_D8  4699
 #define NOTE_DS8 4978
+
+class Buzzer {
+public:
+  Buzzer(uint8_t pin);
+  void play(unsigned int frequency);
+  void play(unsigned int frequency, unsigned long duration);
+  void playClick();
+  void playConfirm();
+  void playHello();
+  void playError();
+  void quiet();
+private:
+  uint8_t _pin;
+};

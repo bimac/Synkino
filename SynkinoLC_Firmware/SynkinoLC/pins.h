@@ -10,6 +10,9 @@
 #define OLED_RST        6
 #define OLED_DET        4
 
+#define RSH             8
+#define TSH             9
+
 #define VS1053_RST     21  // VS1053 reset pin (output)
 #define VS1053_CS      19  // VS1053 chip select pin (output)
 #define VS1053_DCS     15  // VS1053 Data/command select pin (output)
@@ -21,7 +24,7 @@
 #define ENCODER_B      22
 #define ENCODER_BTN    20
 
-#define BUZZER         17
+#define PIN_BUZZER     17
 
 #define IMPULSE         0
 #define STARTMARK       1

@@ -7,6 +7,9 @@ const char *uCVersion = "SynkinoLC v1.0 alpha\n";
 #include <U8g2lib.h>
 #include <EEPROM.h>
 
+#include "buzzer.h"
+
+
 // #include "TeensyTimerTool.h"
 // using namespace TeensyTimerTool;
 
@@ -26,7 +29,6 @@ using namespace EncoderTool;
 #include "time.h"   // useful time constants and macros
 #include "vars.h"   // initialization of constants and vars
 #include "xbm.h"    // XBM graphics
-#include "notes.h"  // buzzer frequencies
 
 // Initialize Objects
 Adafruit_VS1053_FilePlayer musicPlayer(VS1053_RST, VS1053_CS, VS1053_DCS, VS1053_DREQ, CARD_CS);
@@ -35,6 +37,7 @@ PolledEncoder enc;
 IntervalTimer encTimer;
 //PeriodicTimer dimmingTimer;
 IntervalTimer dimmingTimer;
+Buzzer buzzer(PIN_BUZZER);
 
 #define DISPLAY_DIM_AFTER   5000
 #define DISPLAY_BLANK_AFTER 600000
@@ -53,7 +56,6 @@ void setup(void) {
   SPI.setSCK(SPI_SCK);
 
   // set pin mode
-  pinMode(BUZZER, OUTPUT);
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(CARD_DET, INPUT_PULLUP);
   pinMode(OLED_DET, INPUT_PULLDOWN);
@@ -117,17 +119,17 @@ void setup(void) {
   restoreLastProjectorUsed();
 
   // Say "Hello!"
-  playHello();
+  buzzer.playHello();
   Serial.println("Startup complete.\n");
 }
 
 void PULSE_ISR() {
   if (digitalReadFast(IMPULSE)) {
     digitalWriteFast(LED_BUILTIN, HIGH);
-    tone(BUZZER, 4400);
+    buzzer.play(4400);
   } else {
     digitalWriteFast(LED_BUILTIN, LOW);
-    noTone(BUZZER);
+    buzzer.quiet();
   }
 }
 
@@ -381,7 +383,7 @@ uint16_t selectTrackScreen() {
     if (enc.valueChanged() || first) {
       first   = false;
       trackNo = enc.getValue();
-      playClick();
+      buzzer.playClick();
       u8g2->firstPage();
       if (trackNo == 0) {
         do {
@@ -536,7 +538,7 @@ void handleProjectorNameInput() {
           newEncPosition = (isIncrement) ?  32 :  57;
         enc.setValue(newEncPosition);
 
-        playClick();
+        buzzer.playClick();
         oldEncPosition = newEncPosition;
         stopCursorBlinking = true;
         tonePlayedYet = false;
@@ -552,7 +554,7 @@ void handleProjectorNameInput() {
     lastMillis = millis();
     while (!enc.getButton() && !inputFinished) {
       if (!tonePlayedYet) {
-        tone(BUZZER, 4000, 5);
+        buzzer.play(4000, 5);
         tonePlayedYet = true;
       }
       delay(50);
@@ -616,7 +618,7 @@ bool handleStringInputGraphically(byte action, char localChar, unsigned long las
       u8g2->setFont(FONT08);
       u8g2->drawStr(11, 55, "[Keep pressed to Save]");
       if (millis() - lastMillis > 1500) {
-        playConfirm();
+        buzzer.playConfirm();
         return true;
       }
     }
@@ -639,17 +641,17 @@ uint8_t u8x8_GetMenuEvent(u8x8_t *u8x8) {
 
     if (encVal < 0) {
       dimDisplay();                   // wake up display
-      playClick();
+      buzzer.playClick();
       return U8X8_MSG_GPIO_MENU_UP;
 
     } else if (encVal > 0) {
       dimDisplay();                   // wake up display
-      playClick();
+      buzzer.playClick();
       return U8X8_MSG_GPIO_MENU_DOWN;
 
     } else if (!enc.getButton()) {
       dimDisplay();                   // wake up display
-      tone(BUZZER, 4000, 5);
+      buzzer.play(4000, 5);
       while (!enc.getButton()) {}
       return U8X8_MSG_GPIO_MENU_SELECT;
 
@@ -681,12 +683,8 @@ void printASCII(char *buffer) {
 }
 
 void showError(const char* errorHeader, const char* errorMsg1, const char* errorMsg2) {
-  if (strcmp(errorHeader, "ERROR")==0) {
-    tone(BUZZER, NOTE_G2, 250);
-    delay(250);
-    tone(BUZZER, NOTE_C2, 500);
-    delay(500);
-  }
+  if (strcmp(errorHeader, "ERROR")==0)
+    buzzer.playError();
   userInterfaceMessage(errorHeader, errorMsg1, errorMsg2, " Okay ");
 }
 
@@ -700,28 +698,6 @@ void restoreLastProjectorUsed() {
     saveProjector(NEW);
   } else
     loadProjectorConfig(lastProjectorUsed);
-}
-
-void playClick() {
-  tone(BUZZER, 2200, 3);
-}
-
-void playConfirm() {
-  tone(BUZZER, NOTE_C7, 50);
-  delay(50);
-  tone(BUZZER, NOTE_G7, 50);
-  delay(50);
-  tone(BUZZER, NOTE_C8, 50);
-}
-
-void playHello() {
-  tone(BUZZER, NOTE_C7, 25);
-  delay(25);
-  tone(BUZZER, NOTE_D7, 25);
-  delay(25);
-  tone(BUZZER, NOTE_E7, 25);
-  delay(25);
-  tone(BUZZER, NOTE_F7, 25);
 }
 
 bool patchVS1053() {
