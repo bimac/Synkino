@@ -95,6 +95,7 @@ public:
   Buzzer(uint8_t pin);
   void play(unsigned int frequency);
   void play(unsigned int frequency, unsigned long duration);
+  void playDelay(unsigned int frequency, unsigned long duration);
   void playClick();
   void playConfirm();
   void playHello();
