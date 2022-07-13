@@ -1,6 +1,5 @@
 #pragma once
 
-// Hardware SPI
 #define SPI_MOSI       11
 #define SPI_MISO       12
 #define SPI_SCK        14  // Alternative pin to bypass the LED
@@ -13,12 +12,12 @@
 #define RSH             8
 #define TSH             9
 
-#define VS1053_RST     21  // VS1053 reset pin (output)
-#define VS1053_CS      19  // VS1053 chip select pin (output)
-#define VS1053_DCS     15  // VS1053 Data/command select pin (output)
-#define VS1053_DREQ    10  // VS1053 Data request, ideally an Interrupt pin
-#define CARD_CS        18  // SD Card chip select pin
-#define CARD_DET       16  // SD Card detection
+#define VS1053_RST     21  // reset pin
+#define VS1053_CS      19  // chip select pin
+#define VS1053_DCS     15  // data/command select
+#define VS1053_DREQ    10  // data request
+#define VS1053_SDCS    18  // SD card chip select
+#define VS1053_SDCD    16  // SD card detection
 
 #define ENCODER_A      23
 #define ENCODER_B      22

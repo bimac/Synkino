@@ -1,27 +1,17 @@
 const char *uCVersion = "SynkinoLC v1.0 alpha\n";
 
 #include <Arduino.h>
-#include <Adafruit_VS1053.h>
-#include <SD.h>
-#include <SPI.h>
 #include <U8g2lib.h>
 #include <EEPROM.h>
 
+#include "vs1053b.h"
 #include "buzzer.h"
-
 
 // #include "TeensyTimerTool.h"
 // using namespace TeensyTimerTool;
 
 #include <EncoderTool.h>
 using namespace EncoderTool;
-
-
-// Add patches.053 to flash? Not possible with TeensyLC.
-#ifdef INC_PATCHES
-  #include <incbin.h>
-  INCBIN(Patch, "patches.053");
-#endif
 
 #include "menus.h"  // menu definitions, positions of menu items
 #include "pins.h"   // pin definitions
@@ -31,7 +21,7 @@ using namespace EncoderTool;
 #include "xbm.h"    // XBM graphics
 
 // Initialize Objects
-Adafruit_VS1053_FilePlayer musicPlayer(VS1053_RST, VS1053_CS, VS1053_DCS, VS1053_DREQ, CARD_CS);
+VS1053B musicPlayer(VS1053_RST, VS1053_CS, VS1053_DCS, VS1053_DREQ, VS1053_SDCS, VS1053_SDCD);
 U8G2* u8g2;
 PolledEncoder enc;
 IntervalTimer encTimer;
@@ -50,24 +40,23 @@ void setup(void) {
   Serial.begin(9600);
   Serial.printf("Welcome to %s\n",uCVersion);
 
-  // set HW SPI pins (in case we go for alternative pins)
+  // set pin mode
+  pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(OLED_DET, INPUT_PULLDOWN);
+  pinMode(TSH, INPUT_PULLUP);
+  pinMode(RSH, INPUT_PULLUP);
+
+  // set HW SPI pins
   SPI.setMOSI(SPI_MOSI);
   SPI.setMISO(SPI_MISO);
   SPI.setSCK(SPI_SCK);
 
-  // set pin mode
-  pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(CARD_DET, INPUT_PULLUP);
-  pinMode(OLED_DET, INPUT_PULLDOWN);
-
   // initialize u8g2 / display boot splash
-  if (digitalReadFast(OLED_DET)) {
-    Serial.println("Initializing SSD1306 display ...");
-    u8g2 = new U8G2_SSD1306_128X64_NONAME_1_4W_HW_SPI(U8G2_R0, OLED_CS, OLED_DC, OLED_RST);
-  } else {
-    Serial.println("Initializing SH1106 display ...");
+  Serial.println("Initializing display ...");
+  if (digitalReadFast(OLED_DET))
+    u8g2 = new U8G2_SSD1306_128X64_NONAME_1_4W_HW_SPI(U8G2_R2, OLED_CS, OLED_DC, OLED_RST);
+  else
     u8g2 = new U8G2_SH1106_128X64_NONAME_1_4W_HW_SPI(U8G2_R0, OLED_CS, OLED_DC, OLED_RST);
-  }
   u8g2->begin();
   u8g2->firstPage();
   do {
@@ -80,8 +69,6 @@ void setup(void) {
     u8g2->drawXBMP(logolc_xbm_x, logolc_xbm_y, logolc_xbm_width, logolc_xbm_height, logolc_xbm_bits);
     u8g2->drawXBMP(ifma_xbm_x, ifma_xbm_y, ifma_xbm_width, ifma_xbm_height, ifma_xbm_bits);
   } while ( u8g2->nextPage() );
-
-  u8g2->sendBuffer();
   delay(2000);
   u8g2->setFont(FONT10);
 
@@ -93,22 +80,22 @@ void setup(void) {
   encTimer.priority(200);
   encTimer.begin([]() { enc.tick(); }, 200);
 
-  // initialize SD
-  Serial.println("Initializing SD card ...");
-  while (!digitalRead(CARD_DET))
+  // initialize VS1053B breakout
+  while (!musicPlayer.SDinserted())
     showError("ERROR", "Please insert", "SD card");
-  if (!SD.begin(CARD_CS))
-    showError("ERROR", "Could not initialize", "SD card");
+  switch (musicPlayer.begin()) {
+    case 0:
+      break;
+    case 1:
+      showError("ERROR", "Could not initialize", "SD card"); break;
+    case 2:
+      showError("ERROR", "Could not initialize", "VS1053B Breakout"); break;
+    case 3:
+      showError("ERROR", "Could not apply", "patches.053");
+  }
 
-  // initialize VS1053
-  Serial.println("Initializing VS1053 ...");
-  if (!musicPlayer.begin())
-    showError("ERROR", "Could not initialize", "VS1053B Breakout");
-  if (!patchVS1053())
-    showError("ERROR", "Could not apply", "patches.053");
-  musicPlayer.useInterrupt(VS1053_FILEPLAYER_PIN_INT);
-  musicPlayer.setVolume(20, 20);
-  musicPlayer.startPlayingFile("/track001.mp3");
+  // if (!patchVS1053())
+  //   showError("ERROR", "Could not apply", "patches.053");
 
   // initialize timer for dimming the display
   //dimmingTimer.begin(callback, 1'000'000);
@@ -446,15 +433,16 @@ uint8_t loadTrackByNo(int trackNo) {
       Serial.println(result);
     } else {
 
-//     musicPlayer.pauseMusic();
+   // musicPlayer.pausePlaying(true);
+    musicPlayer.sciWrite(SCI_DECODE_TIME, 0); // Reset the Decode and bitrate from previous play back
+    delay(100);
 
-// //    musicPlayer.Mp3WriteRegister(SCI_DECODE_TIME, 0); // Reset the Decode and bitrate from previous play back
-// //    delay(100);
+    musicPlayer.setVolume(254,254);
+    musicPlayer.setVolume(4,4);
+    Serial.println(F("Waiting for start mark..."));
+    musicPlayer.enableResampler();
 
-//       musicPlayer.setVolume(254,254);
-//       musicPlayer.setVolume(4,4);
-//       Serial.println(F("Waiting for start mark..."));
-//       enableResampler();
+    musicPlayer.adjustSamplerate(100); ///test!
 
 //       physicalSamplingrate = Read16BitsFromSCI(SCI_AUDATA) & 0xfffe;  // Mask the Mono/Stereo Bit
 //       updateFpsDependencies(sollfps);   // TODO: do it again, this time to adjust for sampling rates. Maybe betteer as a second function?
@@ -698,34 +686,6 @@ void restoreLastProjectorUsed() {
     saveProjector(NEW);
   } else
     loadProjectorConfig(lastProjectorUsed);
-}
-
-bool patchVS1053() {
-  if (SD.exists("/patches.053")) {
-    // If patches.053 is found on SD we'll always try to load it from there ...
-    File file = SD.open("/patches.053", O_READ);
-    uint16_t size = file.size();
-    uint8_t patch[size];
-    Serial.printf("Applying \"patches.053\" (%d bytes) from SD card ... ", size);
-    bool success = file.read(&patch, size) == size;
-    file.close();
-    if (success) {
-      musicPlayer.applyPatch(reinterpret_cast<uint16_t*>(patch), size/2);
-      Serial.println("done");
-      return success;
-    } else
-      Serial.println("error reading file.");
-  }
-  else {
-    // ... if not, we'll load it from flash memory
-    #ifdef INC_PATCHES
-    Serial.printf("Applying \"patches.053\" (%d bytes) from flash ... ", gPatchSize);
-    musicPlayer.applyPatch(reinterpret_cast<const uint16_t*>(gPatchData), gPatchSize/2);
-    Serial.printf("done\n\n");
-    return true;
-    #endif
-  }
-  return false;
 }
 
 uint8_t userInterfaceMessage(const char *title1, const char *title2, const char *title3, const char *buttons) {
