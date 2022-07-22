@@ -1,8 +1,7 @@
 #include <Arduino.h>
 #include "buzzer.h"
 
-Buzzer::Buzzer(uint8_t pin) {
-  _pin = pin;
+Buzzer::Buzzer(uint8_t pin) : _pin { pin }  {
   pinMode(pin, OUTPUT);
 }
 
@@ -14,31 +13,34 @@ void Buzzer::play(unsigned int frequency, unsigned long duration) {
   tone(_pin, frequency, duration);
 }
 
-void Buzzer::playDelay(unsigned int frequency, unsigned long duration) {
+void Buzzer::play(unsigned int frequency, unsigned long duration, bool useDelay) {
   tone(_pin, frequency, duration);
-  delay(duration);
+  if (useDelay)
+    delay(duration);
 }
 
 void Buzzer::playClick() {
   play(2200, 3);
 }
 
+void Buzzer::playPress() {
+  play(4000, 5);
+}
+
 void Buzzer::playConfirm() {
-  playDelay(NOTE_C7, 50);
-  playDelay(NOTE_G7, 50);
-  playDelay(NOTE_C8, 50);
+  play(NOTE_C7, 50, true);
+  play(NOTE_G7, 50, true);
+  play(NOTE_C8, 50);
 }
 
 void Buzzer::playHello() {
-  playDelay(NOTE_C7, 25);
-  playDelay(NOTE_D7, 25);
-  playDelay(NOTE_E7, 25);
-  playDelay(NOTE_F7, 25);
+  play(NOTE_CS6, 85, true);
+  play(NOTE_C7, 700, true);
 }
 
 void Buzzer::playError() {
-  playDelay(NOTE_G2, 250);
-  playDelay(NOTE_C2, 500);
+  play(NOTE_G2, 250, true);
+  play(NOTE_C2, 500, true);
 }
 
 void Buzzer::quiet() {

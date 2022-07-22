@@ -19,11 +19,11 @@
 #define VS1053_SDCS    18  // SD card chip select
 #define VS1053_SDCD    16  // SD card detection
 
-#define ENCODER_A      23
-#define ENCODER_B      22
-#define ENCODER_BTN    20
+#define ENC_A          23
+#define ENC_B          22
+#define ENC_BTN        20
 
 #define PIN_BUZZER     17
 
-#define IMPULSE         0
-#define STARTMARK       1
+#define IMPULSE         2
+#define STARTMARK       3

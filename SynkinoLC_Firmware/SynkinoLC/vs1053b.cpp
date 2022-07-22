@@ -1,4 +1,5 @@
 #include "vs1053b.h"
+#include "serialdebug.h"
 
 // Add patches.053 to flash?
 #ifdef INC_PATCHES
@@ -14,11 +15,11 @@ VS1053B::VS1053B(int8_t rst, int8_t cs, int8_t dcs, int8_t dreq, int8_t cardCS, 
 }
 
 uint8_t VS1053B::begin() {
-  Serial.println("Initializing SD card ...");
+  PRINTLN("Initializing SD card ...");
   if (!SD.begin(_SDCS))                          // initialize SD library and card
     return 1;
 
-  Serial.println("Initializing VS1053B ...");
+  PRINTLN("Initializing VS1053B ...");
   if (!Adafruit_VS1053_FilePlayer::begin())      // initialize base class
     return 2;
 
@@ -31,7 +32,7 @@ uint8_t VS1053B::begin() {
   #if defined(__MKL26Z64__)                      // Teensy LC  [MKL26Z64]
 
   #elif defined(__MK20DX256__)                   // Teensy 3.2 [MK20DX256]
-    NVIC_SET_PRIORITY(IRQ_PORTC, 140);
+    NVIC_SET_PRIORITY(IRQ_PORTC, 144);
   #elif defined(ARDUINO_TEENSY40)                // Teensy 4.0 [IMXRT1052]
 
   #endif
@@ -47,24 +48,41 @@ bool VS1053B::loadPatch() {
   if (SD.exists("/patches.053")) {
     // If patches.053 is found on SD we'll always try to load it from there ...
     File file = SD.open("/patches.053", O_READ);
-    uint16_t size = file.size();
-    uint8_t patch[size];
-    Serial.printf("Applying \"patches.053\" (%d bytes) from SD card ... ", size);
-    bool success = file.read(&patch, size) == size;
+    uint16_t addr, n, val, i = 0;
+    bool status = false;
+    PRINTF("Applying \"patches.053\" (%d bytes) from SD card ... ", file.size());
+    while (file.read(&addr, 2) && file.read(&n, 2)) {
+      i += 2;
+      if (n & 0x8000U) {
+        n &= 0x7FFF;
+        status = file.read(&val, 2);
+        if (!status)
+          break;
+        while (n--)
+          sciWrite(addr, val);
+      } else {
+        while (n--) {
+          status = file.read(&val, 2);
+          if (!status)
+            break;
+          i++;
+          sciWrite(addr, val);
+        }
+      }
+    }
     file.close();
-    if (success) {
-      applyPatch(reinterpret_cast<uint16_t *>(patch), size / 2);
-      Serial.println("done");
-      return success;
+    if (status) {
+      PRINTLN("done");
+      return status;
     } else
-      Serial.println("error reading file.");
+      PRINTLN("error reading file.");
   }
 
   // ... if not, we'll load it from flash memory
   #ifdef INC_PATCHES
-    Serial.printf("Applying \"patches.053\" (%d bytes) from flash ... ", gPatchSize);
+    PRINTF("Applying \"patches.053\" (%d bytes) from flash ... ", gPatchSize);
     applyPatch(reinterpret_cast<const uint16_t *>(gPatchData), gPatchSize / 2);
-    Serial.printf("done\n\n");
+    PRINTF("done\n\n");
     return true;
   #endif
   return false;
@@ -73,7 +91,7 @@ bool VS1053B::loadPatch() {
 void VS1053B::enableResampler() {
   sciWrite(SCI_WRAMADDR, 0x1e09);
   sciWrite(SCI_WRAM, 0x0080);
-  Serial.println("15/16 resampling enabled.");
+  PRINTLN("15/16 resampling enabled.");
 }
 
 void VS1053B::adjustSamplerate(signed long ppm2) {
@@ -122,3 +140,12 @@ void VS1053B::restoreSampleCounter(unsigned long samplecounter) {
 // uint16_t VS1053B::getBitrate() {
 //   return (Mp3ReadWRAM(PARA_BYTERATE)>>7);
 // }
+
+const char VS1053B::getRevision() {
+  char rev = 0;
+  for (uint8_t i = 0; i<4; i++) {
+    if (GPIO_digitalRead(i))
+      bitSet(rev, i);
+  }
+  return rev + 65;
+}

@@ -27,7 +27,13 @@
 			"vector": "cpp",
 			"initializer_list": "cpp",
 			"cstddef": "cpp",
-			"*.tcc": "cpp"
+			"*.tcc": "cpp",
+			"limits": "cpp",
+			"sstream": "cpp",
+			"streambuf": "cpp",
+			"chrono": "cpp",
+			"typeinfo": "cpp",
+			"fstream": "cpp"
 		}
 	}
 }

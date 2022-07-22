@@ -31,6 +31,7 @@
 #define MENU_ITEM_TWO             2
 #define MENU_ITEM_THREE           3
 #define MENU_ITEM_FOUR            4
+#define MENU_ITEM_FIVE            5
 #define MENU_ITEM_FRAMES          1
 #define MENU_ITEM_P               1
 #define MENU_ITEM_I               2
@@ -77,8 +78,17 @@ const char *trackLoaded_menu =
   "Stop\n"
   "Exit";
 
+#ifdef SERIALDEBUG
 const char *extras_menu =
   "Version\n"
   "Test Impulse\n"
-  "Del EEPROM\n"
-  "Dump EEPROM";
+  "Delete EEPROM\n"
+  "Dump EEPROM\n"
+  "Exit";
+#else
+const char *extras_menu =
+  "Version\n"
+  "Test Impulse\n"
+  "Delete EEPROM\n"
+  "Exit";
+#endif

@@ -95,12 +95,13 @@ public:
   Buzzer(uint8_t pin);
   void play(unsigned int frequency);
   void play(unsigned int frequency, unsigned long duration);
-  void playDelay(unsigned int frequency, unsigned long duration);
+  void play(unsigned int frequency, unsigned long duration, bool delay);
   void playClick();
+  void playPress();
   void playConfirm();
   void playHello();
   void playError();
   void quiet();
 private:
-  uint8_t _pin;
+  const uint8_t _pin;
 };

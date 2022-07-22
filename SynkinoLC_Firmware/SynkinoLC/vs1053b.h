@@ -26,12 +26,15 @@
 #define PARA_POSITIONMSEC_1 0x1E28
 #define PARA_RESYNC         0x1E29
 
+extern bool showError(const char*, const char*);
+
 class VS1053B : public Adafruit_VS1053_FilePlayer {
   public:
     VS1053B(int8_t rst, int8_t cs, int8_t dcs, int8_t dreq, int8_t cardCS, uint8_t SDCD);
     uint8_t begin();
     bool loadPatch();
     bool SDinserted();
+    uint8_t loadTrackByNo(uint16_t);
     void enableResampler();
     void adjustSamplerate(signed long ppm2);
     void clearSampleCounter();
@@ -39,7 +42,8 @@ class VS1053B : public Adafruit_VS1053_FilePlayer {
     unsigned int read16BitsFromSCI(unsigned short addr);
     unsigned long read32BitsFromSCI(unsigned short addr);
     void restoreSampleCounter(unsigned long samplecounter);
+    const char getRevision();
   private:
-    uint8_t _SDCD;
-    uint8_t _SDCS;
+    const uint8_t _SDCD;
+    const uint8_t _SDCS;
 };

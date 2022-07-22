@@ -1,11 +1,5 @@
 #pragma once
 
-const int myAddress = 0x07;     // Our i2c address here
-
-// const byte encType = 15;    // 15 dents
-const byte encType = 30; // 30 dents
-
-
 const byte maxProjectorNameLength = 12;
 const byte maxProjectorCount = 8;
 char newProjectorName[maxProjectorNameLength + 1];
@@ -34,11 +28,9 @@ uint8_t startMarkHit = 0;
 uint8_t projectorPaused = 0;
 
 unsigned long totalSeconds = 0;
-uint8_t hours   = 0;
-uint8_t minutes = 0;
-uint8_t seconds = 0;
-
-volatile unsigned long lastActivityMillies = millis();
+uint8_t myHours   = 0;
+uint8_t myMinutes = 0;
+uint8_t mySeconds = 0;
 
 int oosyncFrames = 0;
 
@@ -57,7 +49,7 @@ byte lastProjectorUsed = 1;
  *  EEPROM.read(0, projectorCount);
  *  EEPROM.read(1, lastProjectorUsed);
  */
-struct Projector {          // 19 Bytes per Projector
+struct EEPROM_Projector {          // 19 Bytes per Projector
   byte  index;
   byte  shutterBladeCount;
   byte  startmarkOffset;
