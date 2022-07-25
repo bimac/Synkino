@@ -22,11 +22,6 @@
 #define MENU_ITEM_EDIT            3
 #define MENU_ITEM_DELETE          4
 
-#define MENU_ITEM_NAME            1
-#define MENU_ITEM_SHUTTER_BLADES  2
-#define MENU_ITEM_STARTMARK       3
-#define MENU_ITEM_PID             4
-
 #define MENU_ITEM_ONE             1
 #define MENU_ITEM_TWO             2
 #define MENU_ITEM_THREE           3
@@ -60,18 +55,6 @@ const char *projector_action_menu =
   "Edit\n"
   "Delete\n"
   "Exit";
-
-const char *projector_config_menu =
-  "Name\n"
-  "Shutter Blades\n"
-  "Start Mark\n"
-  "PID";
-
-const char *shutterblade_menu =
-  "1\n"
-  "2\n"
-  "3\n"
-  "4";
 
 const char *trackLoaded_menu =
   "Manual Start\n"

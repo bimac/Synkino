@@ -1,6 +1,9 @@
 #pragma once
 
 #include <Adafruit_VS1053.h>
+#include "ui.h"
+
+extern UI ui;
 
 // Adding some synonyms for backward compatibility
 #define SCI_MODE            VS1053_REG_MODE
@@ -25,8 +28,6 @@
 #define PARA_POSITIONMSEC_0 0x1E27
 #define PARA_POSITIONMSEC_1 0x1E28
 #define PARA_RESYNC         0x1E29
-
-extern bool showError(const char*, const char*);
 
 class VS1053B : public Adafruit_VS1053_FilePlayer {
   public:
