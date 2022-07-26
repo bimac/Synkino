@@ -21,14 +21,19 @@ uint8_t u8x8_GetMenuEvent(u8x8_t);
 class UI {
   public:
     UI(void);
+    static void insertPaddedInt(char*, uint16_t, uint8_t);
     static void zeroPad(char*, uint16_t, uint8_t, uint8_t);
     static void waitForBttnRelease();
     static void drawBusyBee(u8g2_uint_t x, u8g2_uint_t y);
     static uint8_t userInterfaceMessage(const char *, const char *, const char *, const char *);
-    static bool showError(const char* errorMsg1, const char* errorMsg2);
+    static bool showError(const char*);
+    static bool showError(const char*, const char*);
     static void editCharArray(char*, uint8_t, const char*);
+    static void drawCenteredStr(u8g2_uint_t, const char*);
     static void drawCenteredStr(u8g2_uint_t, const char*, const uint8_t*);
+    static void drawLeftAlignedStr(u8g2_uint_t, const char*);
     static void drawLeftAlignedStr(u8g2_uint_t, const char*, const uint8_t*);
+    static void drawRightAlignedStr(u8g2_uint_t, const char*);
     static void drawRightAlignedStr(u8g2_uint_t, const char*, const uint8_t*);
     int8_t encDir() const&;
     void reverseEncoder(bool);

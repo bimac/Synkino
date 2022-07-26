@@ -11,7 +11,6 @@ char boardRevision[20] = "Hardware Revision X";
 #include <Arduino.h>
 #include <U8g2lib.h>
 #include <EEPROM.h>
-#include <PID_v1.h>
 
 #include "TeensyTimerTool.h"
 using namespace TeensyTimerTool;
@@ -19,8 +18,8 @@ using namespace TeensyTimerTool;
 #include <EncoderTool.h>
 using namespace EncoderTool;
 
-#include "vs1053b.h"
-#include "buzzer.h"
+#include "audio.h"        // all things audio (derived from Adafruit_VS1053_FilePlayer)
+#include "buzzer.h"       // the buzzer and some helper methods
 #include "projector.h"
 #include "ui.h"
 
@@ -33,7 +32,7 @@ using namespace EncoderTool;
 #include "xbm.h"          // XBM graphics
 
 // Initialize Objects
-VS1053B musicPlayer(VS1053_RST, VS1053_CS, VS1053_DCS, VS1053_DREQ, VS1053_SDCS, VS1053_SDCD);
+Audio musicPlayer(VS1053_RST, VS1053_CS, VS1053_DCS, VS1053_DREQ, VS1053_SDCS, VS1053_SDCD);
 U8G2* u8g2;
 PolledEncoder enc;
 PeriodicTimer encTimer(TCK);
@@ -45,10 +44,6 @@ PeriodicTimer encTimer(TCK);
 Buzzer buzzer(PIN_BUZZER);
 Projector projector;
 UI ui;
-
-double Setpoint, Input, Output;
-double Kp=8, Ki=3, Kd=1;  // PonM WINNER für 16 Readings, but with fixed int overflow
-PID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, P_ON_M, DIRECT);
 
 #define DISPLAY_DIM_AFTER   10s
 #define DISPLAY_CLEAR_AFTER 5min
@@ -161,9 +156,9 @@ void loop(void) {
         ui.userInterfaceMessage(uCVersion, boardRevision, uC, " Nice! ");
         break;
       case MENU_ITEM_TEST_IMPULSE:
-        attachInterrupt(digitalPinToInterrupt(IMPULSE), PULSE_ISR, CHANGE);
+        attachInterrupt(IMPULSE, PULSE_ISR, CHANGE);
         ui.userInterfaceMessage("Test Impulse", "", "", "Done");
-        detachInterrupt(digitalPinToInterrupt(IMPULSE));
+        detachInterrupt(IMPULSE);
         break;
       case MENU_ITEM_DEL_EEPROM:
         if (ui.userInterfaceMessage("Delete EEPROM", "Are you sure?", "", " Cancel \n Yes ") == 2)
@@ -178,15 +173,16 @@ void loop(void) {
     break;
   case SELECT_TRACK:
     static int trackChosen;
-    trackChosen = selectTrackScreen();
-    if (trackChosen != 0) {
-      if (loadTrackByNo(trackChosen))
-        myState = WAIT_FOR_LOADING;
-      else
-        myState = SELECT_TRACK;
-    } else {
-      myState = MAIN_MENU;
-    }
+    trackChosen = musicPlayer.selectTrack();
+    myState = MAIN_MENU;
+    // if (trackChosen != 0) {
+    //   if (loadTrackByNo(trackChosen))
+    //     myState = WAIT_FOR_LOADING;
+    //   else
+    //     myState = SELECT_TRACK;
+    // } else {
+    //   myState = MAIN_MENU;
+    // }
     break;
   case WAIT_FOR_LOADING:
     ui.drawBusyBee(90, 10);
@@ -289,37 +285,6 @@ void handleFrameCorrectionOffsetInput() {
   // u8g2.setFont(u8g2_font_helvR10_tr);   // Only until we go to the PLAYING_MENU here
 }
 
-uint16_t selectTrackScreen() {
-  static uint16_t trackNo = 1;
-  bool first = true;
-  enc.setValue((trackNo > 0) ? trackNo : 1);
-  enc.setLimits(0,999);
-  while (enc.getButton()) {
-    yield();
-    if (enc.valueChanged() || first) {
-      first   = false;
-      trackNo = enc.getValue();
-      buzzer.playClick();
-      u8g2->clearBuffer();
-      if (trackNo == 0) {
-        u8g2->setFont(FONT10);
-        u8g2->drawStr(18,35,"< Main Menu");
-      } else {
-        u8g2->setFont(u8g2_font_inb46_mn);
-        u8g2->setCursor(9, 55);
-        if (trackNo <  10) u8g2->print("0");
-        if (trackNo < 100) u8g2->print("0");
-        u8g2->print(trackNo);
-      }
-      u8g2->sendBuffer();
-    }
-  }
-  ui.waitForBttnRelease();
-  enc.setLimits(-999,999);
-  enc.setValue(0);
-  u8g2->setFont(FONT10);
-  return trackNo;
-}
 
 // void updateFpsDependencies(uint8_t fps) {
 //   sollfps = fps;                                // redundant? sollfps is global, fps is local. Horrible.
@@ -330,88 +295,31 @@ uint16_t selectTrackScreen() {
 //   impToAudioSecondsDivider = sollfps * shutterBlades * 2;
 // }
 
-uint8_t loadTrackByNo(uint16_t trackNo) {
-
-  // Yes, its ugly - but avoiding sprintf saves some space
-  char trackName[11] = "000-00.ogg";
-  ui.zeroPad(trackName, trackNo, 3, 0);
-  for (uint8_t fpsGuess = 1; fpsGuess <= 50; fpsGuess++) {
-    ui.zeroPad(trackName, fpsGuess, 2, 4);
-    if (SD.exists(trackName)) {
-      fps = fpsGuess;
-      //updateFpsDependencies(fpsGuess);
-      //tellFrontend(CMD_FOUND_FPS, fpsGuess);
-      break;
-    }
-  }
-
-  if (!SD.exists(trackName))
-    return ui.showError("File not found.", "");
-  if (!audioConnected())
-    return ui.showError("No audio device connected.", "");
-
-  musicPlayer.setVolume(0,0);
-  PRINTF("Loading \"%s\"\n", trackName);
-  if (!musicPlayer.startPlayingFile(trackName))
-    return ui.showError("Cannot open file.", "");
-
-  musicPlayer.sciWrite(SCI_DECODE_TIME, 0); // Reset the Decode and bitrate from previous play back
-  delay(100);
-
-  musicPlayer.enableResampler();
-
-  float physicalSamplingrate = musicPlayer.read16BitsFromSCI(SCI_AUDATA) & 0xfffe;  // Mask the Mono/Stereo Bit
-
-//       updateFpsDependencies(sollfps);   // TODO: do it again, this time to adjust for sampling rates. Maybe betteer as a second function?
-
-  PRINTF("Physical samplingrate: %0.1f Hz\n",physicalSamplingrate);
-
-//   //    PRINT(F("HDAT1 (4F67) :"));                    // Would determine file type, see 9.6.9 in data sheet
-//   //    PRINTLN(Read16BitsFromSCI(SCI_HDAT1), HEX);
-
-  musicPlayer.pausePlaying(true);
-  musicPlayer.setVolume(255,255);
-  musicPlayer.clearSampleCounter();
-  PRINTLN("Waiting for start mark ...");
-//       myState = TRACK_LOADED;
-  trackLoaded = 1;
-
-  return true;
+void drawPlayingMenuConstants(int trackNo, byte fps) {
+  u8g2->setFont(FONT08);
+  u8g2->drawStr(0, 8, projector.config().name);
+  char buffer[9] = "Film 000";
+  ui.insertPaddedInt(&buffer[5], trackNo, 3);
+  ui.drawRightAlignedStr(8, buffer);
+  itoa(fps, buffer, 10);
+  strcat(buffer, " fps");
+  ui.drawRightAlignedStr(62, buffer);
+  u8g2->setFont(FONT10);
 }
 
 void drawWaitForPlayingMenu(int trackNo, byte fps) {
   u8g2->clearBuffer();
-  // u8g2->setFont(FONT08);
-  // u8g2->setCursor(0,8);
-  // u8g2->print(projector.config().name);
-  ui.drawLeftAlignedStr(8, projector.config().name, FONT08);
-  u8g2->setCursor(90,8);
-  u8g2->print("Film ");
-  if (trackNo < 10)  u8g2->print("0");
-  if (trackNo < 100) u8g2->print("0");
-  u8g2->print(trackNo);
-  u8g2->setCursor(98,62);
-  u8g2->print(fps);
-  u8g2->print(" fps");
-  u8g2->setFont(FONT10);
-  u8g2->drawStr(30,28,"Waiting for");
-  u8g2->drawStr(25,46,"Film to Start");
+  drawPlayingMenuConstants(trackNo, fps);
+  ui.drawCenteredStr(28, "Waiting for");
+  ui.drawCenteredStr(46, "Film to Start");
   u8g2->drawXBMP(60, 54, pause_xbm_width, pause_xbm_height, pause_xbm_bits);
   u8g2->sendBuffer();
 }
 
 void drawPlayingMenu(int trackNo, byte fps) {
-  unsigned long currentmillis = millis();
   u8g2->clearBuffer();
-  ui.drawLeftAlignedStr(8, projector.config().name, FONT08);
-  u8g2->setCursor(90,8);
-  u8g2->print("Film ");
-  if (trackNo < 10)  u8g2->print("0");
-  if (trackNo < 100) u8g2->print("0");
-  u8g2->print(trackNo);
-  u8g2->setCursor(98,62);
-  u8g2->print(fps);
-  u8g2->print(" fps");
+  drawPlayingMenuConstants(trackNo, fps);
+  unsigned long currentmillis = millis();
   u8g2->setFont(u8g2_font_inb24_mn);
   u8g2->drawStr(20,36,":");
   u8g2->drawStr(71,36,":");
@@ -481,17 +389,6 @@ void breathe(bool doBreathe) {
     tOff.stop();
     digitalWriteFast(LED_BUILTIN, LOW);
   }
-}
-
-bool audioConnected() {
-  pinMode(TSH, OUTPUT);
-  pinMode(RSH, INPUT);
-  digitalWrite(TSH, HIGH);
-  bool out = !digitalRead(RSH);
-  digitalWrite(TSH, LOW);
-  pinMode(TSH, INPUT_DISABLE);
-  pinMode(RSH, INPUT_DISABLE);
-  return out;
 }
 
 // This overwrites the weak function in u8x8_debounce.c

@@ -20,7 +20,7 @@ void Buzzer::play(unsigned int frequency, unsigned long duration, bool useDelay)
 }
 
 void Buzzer::playClick() {
-  play(8000, 2);
+  play(2200, 3);
 }
 
 void Buzzer::playPress() {

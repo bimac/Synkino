@@ -19,7 +19,7 @@ void Projector::lastUsed(uint8_t n) {
 }
 
 bool Projector::load() {
-  uint8_t idx = select("Edit Projector");
+  uint8_t idx = select("Select Projector");
   return load(idx);
 }
 
