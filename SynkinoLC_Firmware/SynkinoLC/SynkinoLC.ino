@@ -26,8 +26,8 @@ using namespace EncoderTool;
 #include "serialdebug.h"  // macros for serial debugging
 #include "menus.h"        // menu definitions, positions of menu items
 #include "pins.h"         // pin definitions
-#include "states.h"       // state definitions
-#include "timeconst.h"    // useful time constants and macros
+//#include "states.h"       // state definitions
+//#include "timeconst.h"    // useful time constants and macros
 #include "vars.h"         // initialization of constants and vars
 #include "xbm.h"          // XBM graphics
 
@@ -47,6 +47,7 @@ UI ui;
 
 #define DISPLAY_DIM_AFTER   10s
 #define DISPLAY_CLEAR_AFTER 5min
+uint8_t myState = MENU_MAIN;
 
 void setup(void) {
 
@@ -112,66 +113,76 @@ void PULSE_ISR() {
 
 void loop(void) {
   switch (myState) {
-  case MAIN_MENU:
-    mainMenuSelection = u8g2->userInterfaceSelectionList("Main Menu", MENU_ITEM_SELECT_TRACK, main_menu);
-    switch (mainMenuSelection) {
-    case MENU_ITEM_PROJECTOR:
+  case MENU_MAIN:
+    myState = u8g2->userInterfaceSelectionList("Main Menu", 2, main_menu) * 10;
+    break;
 
-      projectorActionMenuSelection = u8g2->userInterfaceSelectionList("Projector", MENU_ITEM_SELECT, projector_action_menu);
-      switch (projectorActionMenuSelection) {
-      case MENU_ITEM_NEW:
-        projector.create();
-        break;
-      case MENU_ITEM_SELECT:
-        projector.load();
-        break;
-      case MENU_ITEM_EDIT:
-        projector.edit();
-        break;
-      case MENU_ITEM_DELETE:
-        projector.remove();
-      }
-      break;
+  case MENU_PROJECTOR:
+    myState += u8g2->userInterfaceSelectionList("Projector", 2, projector_action_menu);
+    break;
 
-    case MENU_ITEM_SELECT_TRACK:
-      while (!musicPlayer.selectTrack()) {}
-      myState = MAIN_MENU;
-      detachInterrupt(STARTMARK);
-      digitalWriteFast(LED_BUILTIN, LOW);
-      break;
+  case MENU_PROJECTOR_NEW:
+    projector.create();
+    myState = MENU_MAIN;
+    break;
 
-    case MENU_ITEM_EXTRAS:
+  case MENU_PROJECTOR_SELECT:
+    projector.load();
+    myState = MENU_MAIN;
+    break;
 
-      // only offer e2dump() if SERIALDEBUG flag is set and we're actually connected to a serial monitor
-      const char* myMenu = extras_menu;
-      #ifdef SERIALDEBUG
-      myMenu = (Serial) ? extras_menu_serial : extras_menu;
-      #endif
-      extrasMenuSelection = u8g2->userInterfaceSelectionList("Extras", MENU_ITEM_VERSION, myMenu);
+  case MENU_PROJECTOR_EDIT:
+    projector.edit();
+    myState = MENU_MAIN;
+    break;
 
-      switch (extrasMenuSelection) {
-      case MENU_ITEM_VERSION:
-        ui.userInterfaceMessage(uCVersion, boardRevision, uC, " Nice! ");
-        break;
+  case MENU_PROJECTOR_DELETE:
+    projector.remove();
+    myState = MENU_MAIN;
+    break;
 
-      case MENU_ITEM_TEST_IMPULSE:
-        attachInterrupt(IMPULSE, PULSE_ISR, CHANGE);
-        ui.userInterfaceMessage("Test Impulse", "", "", "Done");
-        detachInterrupt(IMPULSE);
-        break;
+  case MENU_SELECT_TRACK:
+    while (!musicPlayer.selectTrack()) {}
+    myState = MENU_MAIN;
+    detachInterrupt(STARTMARK);
+    digitalWriteFast(LED_BUILTIN, LOW);
+    break;
 
-      case MENU_ITEM_DEL_EEPROM:
-        if (ui.userInterfaceMessage("Delete EEPROM", "Are you sure?", "", " Cancel \n Yes ") == 2)
-          projector.e2delete();
-        break;
+  case MENU_EXTRAS:
+    #ifdef SERIALDEBUG
+    myState += u8g2->userInterfaceSelectionList("Extras", 1, (Serial) ? extras_menu_serial : extras_menu);
+    #else
+    myState += u8g2->userInterfaceSelectionList("Extras", 1, extras_menu);
+    #endif
+    break;
 
-      #ifdef SERIALDEBUG
-      case MENU_ITEM_DUMP:
-        if (myMenu==extras_menu_serial)
-          projector.e2dump();
-      #endif
-      }
-    }
+  case MENU_EXTRAS_VERSION:
+    ui.userInterfaceMessage(uCVersion, boardRevision, uC, " Nice! ");
+    myState = MENU_MAIN;
+    break;
+
+  case MENU_EXTRAS_IMPULSE:
+    attachInterrupt(IMPULSE, PULSE_ISR, CHANGE);
+    ui.userInterfaceMessage("Test Impulse", "", "", "Done");
+    detachInterrupt(IMPULSE);
+    myState = MENU_MAIN;
+    break;
+
+  case MENU_EXTRAS_DEL_EEPROM:
+    if (ui.userInterfaceMessage("Delete EEPROM", "Are you sure?", "", " Cancel \n Yes ") == 2)
+      projector.e2delete();
+    myState = MENU_MAIN;
+    break;
+
+  #ifdef SERIALDEBUG
+  case MENU_EXTRAS_DUMP_EEPROM:
+    projector.e2dump();
+    myState = MENU_MAIN;
+    break;
+  #endif
+
+  default:
+    myState = MENU_MAIN;
   }
 }
 
@@ -312,7 +323,7 @@ void dimDisplay(bool activity) {
   } else if (c > 0) {
     dimmingTimer.trigger((c > 1) ? 4ms : DISPLAY_CLEAR_AFTER);
     u8g2->setContrast(--c);
-  } else if (myState == MAIN_MENU) {
+  } else if (myState == MENU_MAIN) {
     u8g2->clearDisplay();
     breathe(true);
   }

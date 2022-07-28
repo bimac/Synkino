@@ -98,10 +98,7 @@ bool Projector::edit() {
 bool Projector::edit(uint8_t idx) {
   EEPROMstruct aProjector;        // start with default projector struct
 
-  if (idx == 0) {                 // we have a NEW projector here
-    idx = count() + 1;            // set new idx
-    count(idx);                   // update EEPROM: projector count
-  } else
+  if (idx > 0)
     aProjector = e2load(idx);     // load data from EEPROM
 
   ui.editCharArray(aProjector.name, MAX_PROJECTOR_NAME_LENGTH, "Set Projector Name");
@@ -113,6 +110,10 @@ bool Projector::edit(uint8_t idx) {
   u8g2->userInterfaceInputValue("Derivative:",        "", &aProjector.d,                 0,  99, 2, "");
   ui.reverseEncoder(false);
 
+  if (idx == 0) {                 // we have a NEW projector here
+    idx = count() + 1;            // set new idx
+    count(idx);                   // update EEPROM: projector count
+  }
   e2save(idx,aProjector);         // store projector data to EEPROM
   return load(idx);               // use this projector
 }
