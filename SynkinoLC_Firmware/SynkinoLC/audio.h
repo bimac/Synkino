@@ -42,6 +42,7 @@ class Audio : public Adafruit_VS1053_FilePlayer {
     void restoreSampleCounter(unsigned long samplecounter);
     const char getRevision();
     static void countISR();
+    static void leaderISR();
   private:
     void speedControlPID();
     bool connected();

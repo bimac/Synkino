@@ -61,17 +61,17 @@ const char *trackLoaded_menu =
   "Stop\n"
   "Exit";
 
-#ifdef SERIALDEBUG
 const char *extras_menu =
+  "Version\n"
+  "Test Impulse\n"
+  "Delete EEPROM\n"
+  "Exit";
+
+#ifdef SERIALDEBUG
+const char *extras_menu_serial =
   "Version\n"
   "Test Impulse\n"
   "Delete EEPROM\n"
   "Dump EEPROM\n"
-  "Exit";
-#else
-const char *extras_menu =
-  "Version\n"
-  "Test Impulse\n"
-  "Delete EEPROM\n"
   "Exit";
 #endif

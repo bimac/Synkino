@@ -35,6 +35,7 @@ class UI {
     static void drawLeftAlignedStr(u8g2_uint_t, const char*, const uint8_t*);
     static void drawRightAlignedStr(u8g2_uint_t, const char*);
     static void drawRightAlignedStr(u8g2_uint_t, const char*, const uint8_t*);
+    static void drawSplash();
     int8_t encDir() const&;
     void reverseEncoder(bool);
   private:

@@ -1,4 +1,5 @@
 #include "ui.h"
+#include "buzzer.h"
 
 UI::UI(void) {}
 
@@ -48,7 +49,7 @@ uint8_t UI::userInterfaceMessage(const char *title1, const char *title2, const c
 }
 
 bool UI::showError(const char* errorMsg1) {
-  showError(errorMsg1, "");
+  return showError(errorMsg1, "");
 }
 
 bool UI::showError(const char* errorMsg1, const char* errorMsg2) {
@@ -212,4 +213,19 @@ void UI::editCharArray(char* name, uint8_t charLim, const char* prompt) {
     prevCursor = thisCursor;
     prevChar   = thisChar;
   }
+}
+
+void UI::drawSplash() {
+  for (int8_t y = -logo_xbm_height; y <= logo_xbm_y; y++) {
+    u8g2->clearBuffer();
+    u8g2->drawXBMP(logo_xbm_x, y, logo_xbm_width, logo_xbm_height, logo_xbm_bits);
+    u8g2->sendBuffer();
+    delay(10);
+  }
+  u8g2->drawXBMP(logolc_xbm_x, logolc_xbm_y, logolc_xbm_width, logolc_xbm_height, logolc_xbm_bits);
+  u8g2->drawXBMP(ifma_xbm_x, ifma_xbm_y, ifma_xbm_width, ifma_xbm_height, ifma_xbm_bits);
+  u8g2->sendBuffer();
+  buzzer.playHello();
+  u8g2->setFont(FONT10);
+  u8g2->setFontRefHeightText();
 }

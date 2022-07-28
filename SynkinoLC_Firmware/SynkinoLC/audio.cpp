@@ -28,61 +28,66 @@ Audio::Audio(int8_t rst, int8_t cs, int8_t dcs, int8_t dreq, int8_t cardCS, uint
 
 uint8_t Audio::begin() {
   PRINTLN("Initializing SD card ...");
-  if (!SD.begin(_SDCS))                          // initialize SD library and card
+  if (!SD.begin(_SDCS))                           // initialize SD library and card
     return 1;
 
   PRINTLN("Initializing VS1053B ...");
-  if (!Adafruit_VS1053_FilePlayer::begin())      // initialize base class
+  if (!Adafruit_VS1053_FilePlayer::begin())       // initialize base class
     return 2;
 
-  if (!loadPatch())                              // load & apply patch
+  if (!loadPatch())                               // load & apply patch
     return 3;
 
-  useInterrupt(VS1053_FILEPLAYER_PIN_INT);       // use VS1053 DREQ interrupt
+  useInterrupt(VS1053_FILEPLAYER_PIN_INT);        // use VS1053 DREQ interrupt
 
   // decrease priority of DREQ interrupt
-  #if defined(__MKL26Z64__)                      // Teensy LC  [MKL26Z64]
+  #if defined(__MKL26Z64__)                       // Teensy LC  [MKL26Z64]
 
-  #elif defined(__MK20DX256__)                   // Teensy 3.2 [MK20DX256]
+  #elif defined(__MK20DX256__)                    // Teensy 3.2 [MK20DX256]
     NVIC_SET_PRIORITY(IRQ_PORTC, 144);
-  #elif defined(ARDUINO_TEENSY40)                // Teensy 4.0 [IMXRT1052]
+  #elif defined(ARDUINO_TEENSY40)                 // Teensy 4.0 [IMXRT1052]
 
   #endif
 
-  return 0;                                      // return false (no error)
+  return 0;                                       // return false (no error)
 }
 
 bool Audio::SDinserted() {
   return digitalReadFast(_SDCD);
 }
 
+void Audio::leaderISR() {
+  digitalWriteFast(LED_BUILTIN, digitalReadFast(STARTMARK));
+}
+
 void Audio::countISR() {
   noInterrupts();
   static unsigned long lastMicros = 0;
   unsigned long thisMicros = micros();
-  if ((micros()-lastMicros) > 1000) {            // poor man's debounce
+  if ((micros()-lastMicros) > 1000) {             // poor man's debounce
     totalImpCounter++;
     lastMicros = thisMicros;
+    digitalToggleFast(LED_BUILTIN);               // toggle the LED
   }
   interrupts();
 }
 
 bool Audio::selectTrack() {
 
-  // 1. Pick a file and make sure that everything is alright ...
-  while (true) {
-    _trackNum = selectTrackScreen();              // pick a track number
-    if (_trackNum==0)
-      return false;                               // back to main-menu
-    if (loadTrack())                              // try to load track
-      break;
-    else
-      ui.showError("File not found.");
-  }
-  while (!connected())                            // check if audio cable is plugged in
-    ui.showError("Please connect audio device.");
+  // 1. Indicate state of start mark detector via LED
+  attachInterrupt(STARTMARK, leaderISR, CHANGE);
+  leaderISR();
 
-  // 2. Cue file and activate resampler
+  // 2. Pick a file and run some checks
+  _trackNum = selectTrackScreen();                // pick a track number
+  if (_trackNum==0)
+    return true;                                  // back to main-menu
+  if (!loadTrack())                               // try to load track
+    return ui.showError("File not found.");
+  if (!connected())                               // check if audio cable is plugged in
+    return ui.showError("Please connect audio device.");
+
+  // 3. Cue file and activate resampler
   ui.drawBusyBee(90, 10);
   PRINTF("Loading \"%s\"\n", _filename);
   setVolume(254,254);                             // mute
@@ -96,24 +101,62 @@ bool Audio::selectTrack() {
   setVolume(4,4);                                 // raise volume back up for playback
   clearSampleCounter();
 
-  // 3. Prepare PID
+  // 4. Prepare PID
   EEPROMstruct pConf = projector.config();
   myPID.SetMode(AUTOMATIC);
   myPID.SetTunings(pConf.p, pConf.i, pConf.d);
   switch (_fsPhysical) {
-    case 22050: myPID.SetOutputLimits(-400000, 600000); break;
-    case 32000: myPID.SetOutputLimits(-400000, 285000); break;
-    case 44100: myPID.SetOutputLimits(-400000,  77000); break;
-    case 48000: myPID.SetOutputLimits(-400000,  29000); break;
-    default:    myPID.SetOutputLimits(-400000,  77000);
+    case 22050: myPID.SetOutputLimits(-400000, 600000); break;  // 17% - 227%
+    case 32000: myPID.SetOutputLimits(-400000, 285000); break;  // 17% - 159%
+    case 44100: myPID.SetOutputLimits(-400000,  77000); break;  // 17% - 116%
+    case 48000: myPID.SetOutputLimits(-400000,  29000); break;  // 17% - 107%
+    default:    myPID.SetOutputLimits(-400000,  77000);         // lets assume 44.2 kHz here
   }
 
-  attachInterrupt(IMPULSE, countISR, RISING);     // start impulse counter
+  // 5. Run state machine
+  #define CHECK_FOR_LEADER        0
+  #define OFFER_MANUAL_START      1
+  #define WAIT_FOR_STARTMARK      2
+  #define START                   3
+  #define QUIT                  200
 
-  PRINTLN("Waiting for start mark ...");          // WAIT FOR START
-  while (digitalReadFast(STARTMARK)) {
-    void();                                       // there is still leader
+
+  PRINTLN("Waiting for start mark ...");
+
+  uint8_t state = CHECK_FOR_LEADER;
+  while (state != QUIT) {
+
+    switch (state) {
+    case CHECK_FOR_LEADER:
+      if (digitalReadFast(STARTMARK))
+        state = WAIT_FOR_STARTMARK;
+      else
+        state = OFFER_MANUAL_START;
+      break;
+
+    case OFFER_MANUAL_START:
+      break;
+
+    case WAIT_FOR_STARTMARK:
+      if (digitalReadFast(STARTMARK))
+        continue; // there is still leader
+      PRINTLN("Hit start mark!");
+      detachInterrupt(STARTMARK);
+      attachInterrupt(IMPULSE, countISR, RISING); // start impulse counter
+      totalImpCounter = 0;
+      state = START;
+      break;
+
+    case START:
+      if (totalImpCounter < pConf.startmarkOffset)
+        continue;
+      PRINTLN("Start!");
+      state = QUIT;
+      break;
+    }
   }
+  detachInterrupt(IMPULSE);
+
 
   // projector.config().shutterBladeCount * projector.config().startmarkOffset
   clearSampleCounter();
@@ -127,7 +170,7 @@ bool Audio::selectTrack() {
   // impToAudioSecondsDivider = sollfps * shutterBlades * 2;
 
 
-  detachInterrupt(IMPULSE);
+
   return true;
 }
 

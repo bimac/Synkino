@@ -74,20 +74,9 @@ void setup(void) {
   else
     u8g2 = new U8G2_SH1106_128X64_NONAME_F_4W_HW_SPI(U8G2_R0, OLED_CS, OLED_DC, OLED_RST);
   u8g2->begin();
-  for (int8_t y = -logo_xbm_height; y <= logo_xbm_y; y++) {
-    u8g2->clearBuffer();
-    u8g2->drawXBMP(logo_xbm_x, y, logo_xbm_width, logo_xbm_height, logo_xbm_bits);
-    u8g2->sendBuffer();
-    //delay(10);
-  }
-  u8g2->drawXBMP(logolc_xbm_x, logolc_xbm_y, logolc_xbm_width, logolc_xbm_height, logolc_xbm_bits);
-  u8g2->drawXBMP(ifma_xbm_x, ifma_xbm_y, ifma_xbm_width, ifma_xbm_height, ifma_xbm_bits);
-  u8g2->sendBuffer();
-  buzzer.playHello();
+  ui.drawSplash();
   dimmingTimer.begin([] { dimDisplay(0); });
   dimmingTimer.trigger(DISPLAY_DIM_AFTER);
-  u8g2->setFont(FONT10);
-  u8g2->setFontRefHeightText();
 
   // initialize encoder
   PRINTLN("Initializing encoder ...");
@@ -124,7 +113,6 @@ void PULSE_ISR() {
 void loop(void) {
   switch (myState) {
   case MAIN_MENU:
-
     mainMenuSelection = u8g2->userInterfaceSelectionList("Main Menu", MENU_ITEM_SELECT_TRACK, main_menu);
     switch (mainMenuSelection) {
     case MENU_ITEM_PROJECTOR:
@@ -146,85 +134,44 @@ void loop(void) {
       break;
 
     case MENU_ITEM_SELECT_TRACK:
-      myState = SELECT_TRACK;
+      while (!musicPlayer.selectTrack()) {}
+      myState = MAIN_MENU;
+      detachInterrupt(STARTMARK);
+      digitalWriteFast(LED_BUILTIN, LOW);
       break;
 
     case MENU_ITEM_EXTRAS:
-      extrasMenuSelection = u8g2->userInterfaceSelectionList("Extras", MENU_ITEM_VERSION, extras_menu);
+
+      // only offer e2dump() if SERIALDEBUG flag is set and we're actually connected to a serial monitor
+      const char* myMenu = extras_menu;
+      #ifdef SERIALDEBUG
+      myMenu = (Serial) ? extras_menu_serial : extras_menu;
+      #endif
+      extrasMenuSelection = u8g2->userInterfaceSelectionList("Extras", MENU_ITEM_VERSION, myMenu);
+
       switch (extrasMenuSelection) {
       case MENU_ITEM_VERSION:
         ui.userInterfaceMessage(uCVersion, boardRevision, uC, " Nice! ");
         break;
+
       case MENU_ITEM_TEST_IMPULSE:
         attachInterrupt(IMPULSE, PULSE_ISR, CHANGE);
         ui.userInterfaceMessage("Test Impulse", "", "", "Done");
         detachInterrupt(IMPULSE);
         break;
+
       case MENU_ITEM_DEL_EEPROM:
         if (ui.userInterfaceMessage("Delete EEPROM", "Are you sure?", "", " Cancel \n Yes ") == 2)
           projector.e2delete();
         break;
+
+      #ifdef SERIALDEBUG
       case MENU_ITEM_DUMP:
-        projector.e2dump();
-        break;
-      }
-      break;
-    }
-    break;
-  case SELECT_TRACK:
-    static int trackChosen;
-    trackChosen = musicPlayer.selectTrack();
-    myState = MAIN_MENU;
-    // if (trackChosen != 0) {
-    //   if (loadTrackByNo(trackChosen))
-    //     myState = WAIT_FOR_LOADING;
-    //   else
-    //     myState = SELECT_TRACK;
-    // } else {
-    //   myState = MAIN_MENU;
-    // }
-    break;
-  case WAIT_FOR_LOADING:
-    ui.drawBusyBee(90, 10);
-    if ((fps != 0) && (trackLoaded != 0)) {
-      drawWaitForPlayingMenu(trackChosen, fps);
-      myState = TRACK_LOADED;
-    }
-    break;
-  case TRACK_LOADED:
-    if (startMarkHit != 0) {
-      myState = SYNC_PLAY;
-    }
-    // Now check for Sync Pos Adjustments
-    if (!enc.getButton()) {
-      ui.waitForBttnRelease();
-      trackLoadedMenuSelection = u8g2->userInterfaceSelectionList("Playback", MENU_ITEM_EXIT, trackLoaded_menu);
-      switch (trackLoadedMenuSelection) {
-      case MENU_ITEM_MANUALSTART:
-        startMarkHit = 1;
-        // tellAudioPlayer(CMD_SET_STARTMARK, 0);
-        myState = SYNC_PLAY;
-        break;
-      case MENU_ITEM_STOP:
-        // tellAudioPlayer(CMD_RESET, 0);
-        myState = MAIN_MENU;
-        break;
-      case MENU_ITEM_EXIT:
-        drawWaitForPlayingMenu(trackChosen, fps);
-        myState = TRACK_LOADED;
-        break;
+        if (myMenu==extras_menu_serial)
+          projector.e2dump();
+      #endif
       }
     }
-    break;
-  case SYNC_PLAY:
-    drawPlayingMenu(trackChosen, fps);
-    if (!enc.getButton()) {
-      ui.waitForBttnRelease();
-      // handleFrameCorrectionOffsetInput(); // Take Correction Input
-      // ui.waitForBttnRelease();
-      // tellAudioPlayer(CMD_SYNC_OFFSET, newSyncOffset);
-    }
-    break;
   }
 }
 
@@ -365,7 +312,7 @@ void dimDisplay(bool activity) {
   } else if (c > 0) {
     dimmingTimer.trigger((c > 1) ? 4ms : DISPLAY_CLEAR_AFTER);
     u8g2->setContrast(--c);
-  } else {
+  } else if (myState == MAIN_MENU) {
     u8g2->clearDisplay();
     breathe(true);
   }
