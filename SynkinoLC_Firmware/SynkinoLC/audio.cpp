@@ -3,7 +3,41 @@
 #include "serialdebug.h"
 #include "pins.h"
 #include "ui.h"
-#include <PID_v1.h>
+#include <QuickPID.h>
+
+// some synonyms for backward compatibility
+#define SCI_MODE            VS1053_REG_MODE
+#define SCI_STATUS          VS1053_REG_STATUS
+#define SCI_BASS            VS1053_REG_BASS
+#define SCI_CLOCKF          VS1053_REG_CLOCKF
+#define SCI_DECODE_TIME     VS1053_REG_DECODETIME
+#define SCI_AUDATA          VS1053_REG_AUDATA
+#define SCI_WRAM            VS1053_REG_WRAM
+#define SCI_WRAMADDR        VS1053_REG_WRAMADDR
+#define SCI_HDAT0           VS1053_REG_HDAT0
+#define SCI_HDAT1           VS1053_REG_HDAT1
+
+// extra parameters in X memory (section 10.11)
+#define PARA_CHIPID_0       0x1E00
+#define PARA_CHIPID_1       0x1E01
+#define PARA_VERSION        0x1E02
+#define PARA_CONFIG1        0x1E03
+#define PARA_PLAYSPEED      0x1E04
+#define PARA_BYTERATE       0x1E05
+#define PARA_ENDFILLBYTE    0x1E06
+#define PARA_MONOOUTPUT     0x1E09
+#define PARA_POSITIONMSEC_0 0x1E27
+#define PARA_POSITIONMSEC_1 0x1E28
+#define PARA_RESYNC         0x1E29
+
+// state labels
+#define CHECK_FOR_LEADER         0
+#define OFFER_MANUAL_START       1
+#define WAIT_FOR_STARTMARK       2
+#define START                    3
+#define PLAYING                  4
+#define SHUTDOWN               250
+#define QUIT                   255
 
 // Add patches.053 to flash?
 #ifdef INC_PATCHES
@@ -16,8 +50,20 @@ extern Projector projector;
 
 // PID
 volatile unsigned long totalImpCounter = 0;
-double Setpoint, Input, Output;
-PID myPID(&Input, &Output, &Setpoint, 8, 3, 1, 0, 0);
+int32_t syncOffsetImps = 0;
+bool sampleCountRegisterValid = true;
+unsigned long sampleCountBaseLine = 0;
+
+unsigned int impToSamplerateFactor;
+int deltaToFramesDivider;
+unsigned int impToAudioSecondsDivider;
+
+volatile double Setpoint, Input, Output;
+QuickPID myPID(&Input, &Output, &Setpoint, 8, 3, 1,
+               myPID.pMode::pOnError,
+               myPID.dMode::dOnMeas,                    /* dOnError, dOnMeas */
+               myPID.iAwMode::iAwCondition,             /* iAwCondition, iAwClamp, iAwOff */
+               myPID.Action::direct);                   /* direct, reverse */
 
 // Constructor
 Audio::Audio(int8_t rst, int8_t cs, int8_t dcs, int8_t dreq, int8_t cardCS, uint8_t SDCD)
@@ -64,7 +110,8 @@ void Audio::countISR() {
   noInterrupts();
   static unsigned long lastMicros = 0;
   unsigned long thisMicros = micros();
-  if ((micros()-lastMicros) > 1000) {             // poor man's debounce
+
+  if ((micros()-lastMicros) > 2000) {             // poor man's debounce - no periods below 2ms (500Hz)
     totalImpCounter++;
     lastMicros = thisMicros;
     digitalToggleFast(LED_BUILTIN);               // toggle the LED
@@ -73,19 +120,30 @@ void Audio::countISR() {
 }
 
 bool Audio::selectTrack() {
+  EEPROMstruct pConf = projector.config();        // get projector configuration
+  uint8_t state = CHECK_FOR_LEADER;
 
-  // 1. Indicate state of start mark detector via LED
-  attachInterrupt(STARTMARK, leaderISR, CHANGE);
+  // 1. Indicate state of start mark detector by means of LED
   leaderISR();
+  attachInterrupt(STARTMARK, leaderISR, CHANGE);
 
-  // 2. Pick a file and run some checks
+  // 2. Pick a file and run a few checks
   _trackNum = selectTrackScreen();                // pick a track number
   if (_trackNum==0)
     return true;                                  // back to main-menu
   if (!loadTrack())                               // try to load track
-    return ui.showError("File not found.");
+    return ui.showError("File not found.");       // back to track selection
   if (!connected())                               // check if audio cable is plugged in
     return ui.showError("Please connect audio device.");
+  if (!digitalReadFast(STARTMARK)) {              // check for leader
+    if (ui.userInterfaceMessage("Can't detect film leader.",
+                                "Use manual start?", "",
+                                " Cancel \n Yes ") == 2) {
+      state = OFFER_MANUAL_START;
+      detachInterrupt(STARTMARK);
+    } else
+      return true;                                // back to main-menu
+  }
 
   // 3. Cue file and activate resampler
   ui.drawBusyBee(90, 10);
@@ -97,13 +155,22 @@ bool Audio::selectTrack() {
   pausePlaying(true);                             // and pause again
   PRINTF("Sampling rate: %d Hz\n",_fsPhysical);
   enableResampler();
-  delay(200);                                     // wait for pause
+  delay(500);                                     // wait for pause
   setVolume(4,4);                                 // raise volume back up for playback
   clearSampleCounter();
 
+  impToSamplerateFactor = _fsPhysical / _fps / pConf.shutterBladeCount;
+  deltaToFramesDivider = _fsPhysical / _fps;
+  impToAudioSecondsDivider = _fps * pConf.shutterBladeCount;
+  // pausePlaying(false);
+  // while (true) {
+  //   delay(100);
+  //   PRINTF("%d kbps\n", getBitrate());
+  // }
+
   // 4. Prepare PID
-  EEPROMstruct pConf = projector.config();
-  myPID.SetMode(AUTOMATIC);
+  // myPID.SetMode(1);
+  // myPID.SetSampleTime(200);
   myPID.SetTunings(pConf.p, pConf.i, pConf.d);
   switch (_fsPhysical) {
     case 22050: myPID.SetOutputLimits(-400000, 600000); break;  // 17% - 227%
@@ -114,17 +181,10 @@ bool Audio::selectTrack() {
   }
 
   // 5. Run state machine
-  #define CHECK_FOR_LEADER        0
-  #define OFFER_MANUAL_START      1
-  #define WAIT_FOR_STARTMARK      2
-  #define START                   3
-  #define QUIT                  200
-
-
   PRINTLN("Waiting for start mark ...");
 
-  uint8_t state = CHECK_FOR_LEADER;
   while (state != QUIT) {
+    void();
 
     switch (state) {
     case CHECK_FOR_LEADER:
@@ -141,18 +201,31 @@ bool Audio::selectTrack() {
       if (digitalReadFast(STARTMARK))
         continue; // there is still leader
       PRINTLN("Hit start mark!");
+      totalImpCounter = 0;
       detachInterrupt(STARTMARK);
       attachInterrupt(IMPULSE, countISR, RISING); // start impulse counter
-      totalImpCounter = 0;
       state = START;
       break;
 
     case START:
       if (totalImpCounter < pConf.startmarkOffset)
         continue;
+      totalImpCounter = 0;
+      pausePlaying(false);
+      clearSampleCounter();
+      sampleCountBaseLine = read32BitsFromSCI(0x1800);
       PRINTLN("Start!");
-      state = QUIT;
+      state = PLAYING;
       break;
+
+    case PLAYING:
+      speedControlPID();
+      break;
+
+    case SHUTDOWN:
+      stopPlaying();
+      PRINTLN("Stopped Playback.");
+      state = QUIT;
     }
   }
   detachInterrupt(IMPULSE);
@@ -175,71 +248,46 @@ bool Audio::selectTrack() {
 }
 
 void Audio::speedControlPID() {
-//   static unsigned long prevTotalImpCounter;
-//   static unsigned long previousActualSampleCount;
-//   if (totalImpCounter + syncOffsetImps != prevTotalImpCounter) {
+  // static unsigned long lastMillis = millis();
+  // if (millis() - lastMillis < 10)
+  //   return;
 
-//     if (sampleCountRegisterValid) {
-//       long actualSampleCount = Read32BitsFromSCI(0x1800) - sampleCountBaseLine;                 // 8.6ms Latenz here
-//       previousActualSampleCount = actualSampleCount;
-//       if (actualSampleCount < previousActualSampleCount) {
-//         actualSampleCount = previousActualSampleCount;
-//       }
-//       long desiredSampleCount = (totalImpCounter + syncOffsetImps) * impToSamplerateFactor;
-//       long delta = (actualSampleCount - desiredSampleCount);
+  #define numReadings 6
+  static int readIdx = 0;
+  static long readings[numReadings] = {0};
+  static long total = 0; // the running total
 
-// /*
-// //   This puts nifty CSV to the Console, to graph PID results.
-// //      Serial.print(F("Current Sample:\t"));
-//       Serial.print(actualSampleCount);
-//       Serial.print(F(","));
-//       Serial.print(desiredSampleCount);
-//       Serial.print(F(","));
-// //      Serial.print(F(","));
-//       Serial.println(delta);
-// //      Serial.print(F(","));
-// //      Serial.print(F(" Bitrate: "));
-// //      Serial.println(getBitrate());
-// // */
+  static unsigned long prevTotalImpCounter;
+  static unsigned long previousActualSampleCount;
+  if (totalImpCounter + syncOffsetImps != prevTotalImpCounter) {
 
-//       total = total - readings[readIndex];  // subtract the last reading
-//       readings[readIndex] = delta;          // read from the sensor:
-//       total = total + readings[readIndex];  // add the reading to the total:
-//       readIndex = readIndex + 1;            // advance to the next position in the array:
+    if (sampleCountRegisterValid) {
+      long actualSampleCount = read32BitsFromSCI(0x1800) - sampleCountBaseLine;
+      previousActualSampleCount = actualSampleCount;
+      if (actualSampleCount < previousActualSampleCount)
+        actualSampleCount = previousActualSampleCount;
+      long desiredSampleCount = (totalImpCounter + syncOffsetImps) * impToSamplerateFactor;
+      long delta = (actualSampleCount - desiredSampleCount);
 
-//       if (readIndex >= numReadings) {       // if we're at the end of the array...
-//         readIndex = 0;                      // ...wrap around to the beginning:
-//       }
+      readIdx = (readIdx + 1) % numReadings; // update array index
+      total = total - readings[readIdx];     // subtract previous reading from running total
+      readings[readIdx] = delta;             // store new reading to array
+      total += delta;                        // add new reading to running total
+      long average = total / numReadings;    // calculate the average
 
-//       average = total / numReadings;        // calculate the average
-// //    average = (total >> 4);
+      Input = average;
+      myPID.Compute();
+      adjustSamplerate((long) Output);
 
-//       Input = average;
-//       adjustSamplerate((long) Output);
-// //    Serial.println((long) Output);
+      prevTotalImpCounter = totalImpCounter + syncOffsetImps;
 
-//       prevTotalImpCounter = totalImpCounter + syncOffsetImps;
-
-//       myPID.Compute();  // 9.2ms Latenz here
-
-//       static unsigned int prevFrameOffset;
-//       int frameOffset = average / deltaToFramesDivider;
-//       if (frameOffset != prevFrameOffset) {
-//         tellFrontend(CMD_OOSYNC, frameOffset);
-//         prevFrameOffset = frameOffset;
-//       }
-//       // Below is a hack to send a 0 every so often if everything is in sync – since occasionally signal gets lost on i2c due
-//       // to too busy AVRs. Otherwise, the sync icon might not stop blinking in some cases.
-//       if ((frameOffset == 0) && (millis() > (lastInSyncMillis + 500))) {
-//         tellFrontend(CMD_OOSYNC, 0);
-//         lastInSyncMillis = millis();
-//       }
-//     }
-//     if (musicPlayer.isPlaying() == 0) { // and/or musicPlayer.getState() == 4
-//       tellFrontend(CMD_DONE_PLAYING, 0);
-//       resetAudio();
-//     }
-//   }
+      int frameOffset = average / deltaToFramesDivider;
+      //PRINTF("Delta: %d, Average: %d, Offset: %d\n", delta, average, frameOffset);
+      PRINTF("Input: %d, Output: %d\n", (long) Input, (long) Output);
+    }
+    // if (musicPlayer.isPlaying() == 0) // and/or musicPlayer.getState() == 4
+    //   resetAudio();
+  }
 }
 
 uint16_t Audio::getSamplingRate() {
@@ -395,9 +443,9 @@ void Audio::restoreSampleCounter(unsigned long samplecounter) {
   sciWrite(SCI_WRAM, samplecounter >> 16);
 }
 
-// uint16_t Audio::getBitrate() {
-//   return (Mp3ReadWRAM(PARA_BYTERATE)>>7);
-// }
+uint16_t Audio::getBitrate() {
+  return (readWRAM(PARA_BYTERATE)>>7);
+}
 
 const char Audio::getRevision() {
   char rev = 0;
@@ -407,3 +455,30 @@ const char Audio::getRevision() {
   }
   return rev + 65;
 }
+
+uint16_t Audio::readWRAM(uint16_t addressbyte) {
+  // adapted from https://github.com/mpflaga/Arduino_Library-vs1053_for_SdFat
+
+   unsigned short int tmp1,tmp2;
+
+   //Set SPI bus for write
+   //spiInit();
+   //SPI.setClockDivider(spi_Read_Rate);
+
+   sciWrite(VS1053_REG_WRAMADDR, addressbyte);
+   tmp1 = sciRead(SCI_WRAM);
+
+   sciWrite(VS1053_REG_WRAMADDR, addressbyte);
+   tmp2 = sciRead(SCI_WRAM);
+
+   if(tmp1==tmp2) return tmp1;
+   sciWrite(VS1053_REG_WRAMADDR, addressbyte);
+   tmp2 = sciRead(SCI_WRAM);
+
+   if(tmp1==tmp2) return tmp1;
+   sciWrite(VS1053_REG_WRAMADDR, addressbyte);
+   tmp2 = sciRead(SCI_WRAM);
+
+   if(tmp1==tmp2) return tmp1;
+   return tmp1;
+ }

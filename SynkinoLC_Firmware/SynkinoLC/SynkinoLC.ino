@@ -22,14 +22,13 @@ using namespace EncoderTool;
 #include "buzzer.h"       // the buzzer and some helper methods
 #include "projector.h"
 #include "ui.h"
-
 #include "serialdebug.h"  // macros for serial debugging
-#include "menus.h"        // menu definitions, positions of menu items
 #include "pins.h"         // pin definitions
+
+#include "menus.h"        // menu definitions, positions of menu items
 //#include "states.h"       // state definitions
 //#include "timeconst.h"    // useful time constants and macros
 #include "vars.h"         // initialization of constants and vars
-#include "xbm.h"          // XBM graphics
 
 // Initialize Objects
 Audio musicPlayer(VS1053_RST, VS1053_CS, VS1053_DCS, VS1053_DREQ, VS1053_SDCS, VS1053_SDCD);
@@ -46,7 +45,7 @@ Projector projector;
 UI ui;
 
 #define DISPLAY_DIM_AFTER   10s
-#define DISPLAY_CLEAR_AFTER 5min
+#define DISPLAY_CLEAR_AFTER 20s//5min
 uint8_t myState = MENU_MAIN;
 
 void setup(void) {
@@ -312,18 +311,17 @@ void drawPlayingMenu(int trackNo, byte fps) {
 
 void dimDisplay(bool activity) {
   static uint8_t c = 255;
-
-  if (activity) {
+  if (activity) {                                             // wake up on activity
     dimmingTimer.trigger(DISPLAY_DIM_AFTER);
     if (c < 255) {
       c = 255;
       u8g2->setContrast(c);
       breathe(false);
     }
-  } else if (c > 0) {
-    dimmingTimer.trigger((c > 1) ? 4ms : DISPLAY_CLEAR_AFTER);
-    u8g2->setContrast(--c);
-  } else if (myState == MENU_MAIN) {
+  } else if (c > 1) {                                         // smooth dimming
+    dimmingTimer.trigger((c>3) ? 10ms : DISPLAY_CLEAR_AFTER);
+    u8g2->setContrast(c-=2);
+  } else if (myState % 10 == 0 && myState != 20) {            // blank screen & breathing LED (only within main menus)
     u8g2->clearDisplay();
     breathe(true);
   }
@@ -333,7 +331,6 @@ void breathe(bool doBreathe) {
   static PeriodicTimer tOn(TCK);
   static OneShotTimer  tOff(TCK);
   static int8_t ii = 0;
-
   if (doBreathe) {
     tOff.begin([] {
       digitalWriteFast(LED_BUILTIN, LOW);
