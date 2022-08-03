@@ -4,10 +4,10 @@
 #define SPI_MISO       12
 #define SPI_SCK        14  // Alternative pin to bypass the LED
 
-#define OLED_DC         7
-#define OLED_CS         5
-#define OLED_RST        6
-#define OLED_DET        4
+#define OLED_DC         4
+#define OLED_CS         6
+#define OLED_RST        5
+#define OLED_DET        7
 
 #define RSH             8
 #define TSH             9
