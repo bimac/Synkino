@@ -3,6 +3,9 @@
 #include "serialdebug.h"
 #include "pins.h"
 #include "ui.h"
+
+#include "TeensyTimerTool.h"
+using namespace TeensyTimerTool;
 #include <QuickPID.h>
 
 // some synonyms for backward compatibility
@@ -48,6 +51,9 @@
 extern UI ui;
 extern Projector projector;
 
+bool runPID = false;
+PeriodicTimer pidTimer(TCK);
+
 // PID
 volatile unsigned long totalImpCounter = 0;
 int32_t syncOffsetImps = 0;
@@ -58,12 +64,12 @@ unsigned int impToSamplerateFactor;
 int deltaToFramesDivider;
 unsigned int impToAudioSecondsDivider;
 
-volatile double Setpoint, Input, Output;
-QuickPID myPID(&Input, &Output, &Setpoint, 8, 3, 1,
-               myPID.pMode::pOnError,
-               myPID.dMode::dOnMeas,                    /* dOnError, dOnMeas */
-               myPID.iAwMode::iAwCondition,             /* iAwCondition, iAwClamp, iAwOff */
-               myPID.Action::direct);                   /* direct, reverse */
+float Setpoint, Input, Output;
+QuickPID myPID(&Input, &Output, &Setpoint, 8.0, 3.0, 1.0,
+               myPID.pMode::pOnMeas,
+               myPID.dMode::dOnMeas,
+               myPID.iAwMode::iAwClamp,
+               myPID.Action::direct);
 
 // Constructor
 Audio::Audio(int8_t rst, int8_t cs, int8_t dcs, int8_t dreq, int8_t cardCS, uint8_t SDCD)
@@ -86,13 +92,37 @@ uint8_t Audio::begin() {
 
   useInterrupt(VS1053_FILEPLAYER_PIN_INT);        // use VS1053 DREQ interrupt
 
-  // decrease priority of DREQ interrupt
+  // the DREQ interrupt seems to mess with the timing of the impulse detection
+  // which is also using an interrupt. This can be remidied by lowering the
+  // priority of the DREQ interrupt
   #if defined(__MKL26Z64__)                       // Teensy LC  [MKL26Z64]
+    NVIC_SET_PRIORITY(IRQ_PORTCD, 192);
+    // This could be a problem. Interrupt priorities for ports C and D cannot be
+    // changed independently from one another as they share an IRQ number. Thus,
+    // we currently can't prioritize IMPULSE over DREQ:
+    //
+    //    Pin 10 = DREQ      -> Port C4 / IRQ 31
+    //    Pin 02 = IMPULSE   -> Port D0 / IRQ 31
+    //
+    // Possible solution 1: swap IMPULSE and STARTMARK?
+    //
+    //    Pin 03 = STARTMARK -> Port A1 / IRQ 30
+    //    Should also be OK for Teensy 3.2 - see below
+    //
+    // Possible solution 2: use timer instead of DREQ?
+    //
+    //    Meh.
+    //
+    // For reference, see schematics at https://www.pjrc.com/teensy/schematic.html
 
   #elif defined(__MK20DX256__)                    // Teensy 3.2 [MK20DX256]
     NVIC_SET_PRIORITY(IRQ_PORTC, 144);
-  #elif defined(ARDUINO_TEENSY40)                 // Teensy 4.0 [IMXRT1052]
+    //    Pin 10 = DREQ      -> Port C4  / IRQ 89
+    //    Pin 02 = IMPULSE   -> Port D0  / IRQ 90
+    //    Pin 03 = STARTMARK -> Port A12 / IRQ 87
 
+  #elif defined(ARDUINO_TEENSY40)                 // Teensy 4.0 [IMXRT1052]
+    // ?
   #endif
 
   return 0;                                       // return false (no error)
@@ -169,8 +199,7 @@ bool Audio::selectTrack() {
   // }
 
   // 4. Prepare PID
-  // myPID.SetMode(1);
-  // myPID.SetSampleTime(200);
+  myPID.SetMode(myPID.Control::timer);
   myPID.SetTunings(pConf.p, pConf.i, pConf.d);
   switch (_fsPhysical) {
     case 22050: myPID.SetOutputLimits(-400000, 600000); break;  // 17% - 227%
@@ -184,7 +213,7 @@ bool Audio::selectTrack() {
   PRINTLN("Waiting for start mark ...");
 
   while (state != QUIT) {
-    void();
+    yield();
 
     switch (state) {
     case CHECK_FOR_LEADER:
@@ -215,11 +244,15 @@ bool Audio::selectTrack() {
       clearSampleCounter();
       sampleCountBaseLine = read32BitsFromSCI(0x1800);
       PRINTLN("Start!");
+      pidTimer.begin([]() { runPID = true; }, 10_Hz);
       state = PLAYING;
       break;
 
     case PLAYING:
-      speedControlPID();
+      if (runPID) {
+        speedControlPID();
+        runPID = false;
+      }
       break;
 
     case SHUTDOWN:
@@ -252,42 +285,48 @@ void Audio::speedControlPID() {
   // if (millis() - lastMillis < 10)
   //   return;
 
-  #define numReadings 6
-  static int readIdx = 0;
-  static long readings[numReadings] = {0};
-  static long total = 0; // the running total
-
-  static unsigned long prevTotalImpCounter;
+  // static unsigned long prevTotalImpCounter;
   static unsigned long previousActualSampleCount;
-  if (totalImpCounter + syncOffsetImps != prevTotalImpCounter) {
+  // if (totalImpCounter + syncOffsetImps != prevTotalImpCounter) {
 
-    if (sampleCountRegisterValid) {
-      long actualSampleCount = read32BitsFromSCI(0x1800) - sampleCountBaseLine;
+    //if (sampleCountRegisterValid) {
+      unsigned long actualSampleCount = read32BitsFromSCI(0x1800) - sampleCountBaseLine;
       previousActualSampleCount = actualSampleCount;
       if (actualSampleCount < previousActualSampleCount)
         actualSampleCount = previousActualSampleCount;
       long desiredSampleCount = (totalImpCounter + syncOffsetImps) * impToSamplerateFactor;
       long delta = (actualSampleCount - desiredSampleCount);
 
-      readIdx = (readIdx + 1) % numReadings; // update array index
-      total = total - readings[readIdx];     // subtract previous reading from running total
-      readings[readIdx] = delta;             // store new reading to array
-      total += delta;                        // add new reading to running total
-      long average = total / numReadings;    // calculate the average
-
-      Input = average;
+      Input = (float) average(delta);
       myPID.Compute();
       adjustSamplerate((long) Output);
 
-      prevTotalImpCounter = totalImpCounter + syncOffsetImps;
+      // prevTotalImpCounter = totalImpCounter + syncOffsetImps;
 
-      int frameOffset = average / deltaToFramesDivider;
-      //PRINTF("Delta: %d, Average: %d, Offset: %d\n", delta, average, frameOffset);
-      PRINTF("Input: %d, Output: %d\n", (long) Input, (long) Output);
-    }
+      int frameOffset = (long) Input / deltaToFramesDivider;
+      //PRINTF("Delta:%d,Average:%f,FrameOffset: %d\n", delta, Input, frameOffset);
+      //PRINTF("Input:%0.3f,Output:%0.3f\n", Input, Output);
+      //PRINTF("P:%0.5f,I:%0.5f,D:%0.5f\n",myPID.GetPterm(),myPID.GetIterm(),myPID.GetDterm());
+
+    //}
     // if (musicPlayer.isPlaying() == 0) // and/or musicPlayer.getState() == 4
     //   resetAudio();
-  }
+  // }
+}
+
+int32_t Audio::average(int32_t input) {
+  #define numReadings 6
+  static int32_t readings[numReadings] = {0};
+  static int32_t total = 0;
+  static uint8_t readIdx = 0;
+
+  readIdx = (readIdx + 1) % numReadings;  // update array index
+  total = total - readings[readIdx];      // subtract previous reading from running total
+  readings[readIdx] = input;              // store new reading to array
+  total += input;                         // add new reading to running total
+  int32_t average = total / numReadings;  // calculate the average
+
+  return average;
 }
 
 uint16_t Audio::getSamplingRate() {
@@ -337,16 +376,15 @@ uint16_t Audio::selectTrackScreen() {
   return trackNum;
 }
 
-
-
 bool Audio::connected() {
-  pinMode(TSH, OUTPUT);
-  pinMode(RSH, INPUT);
-  digitalWrite(TSH, HIGH);
-  bool out = !digitalRead(RSH);
-  digitalWrite(TSH, LOW);
-  pinMode(TSH, INPUT_DISABLE);
-  pinMode(RSH, INPUT_DISABLE);
+  // test if audio device is plugged into 3.5mm jack
+  pinMode(PIN_TIPSW, OUTPUT);
+  pinMode(PIN_LOUT,  INPUT);
+  digitalWrite(PIN_TIPSW, HIGH);
+  bool out = !digitalRead(PIN_LOUT);
+  digitalWrite(PIN_TIPSW, LOW);
+  pinMode(PIN_TIPSW, INPUT_DISABLE);
+  pinMode(PIN_LOUT,  INPUT_DISABLE);
   return out;
 }
 

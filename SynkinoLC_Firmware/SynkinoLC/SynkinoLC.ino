@@ -1,11 +1,13 @@
 const char *uCVersion = "SynkinoLC v1.0 alpha";
-char boardRevision[20] = "Hardware Revision X";
-#if defined(__MKL26Z64__)
-  const char *uC = "with Teensy LC";
-#elif defined(__MK20DX256__)
-  const char *uC = "with Teensy 3.1 / 3.2";
-#elif defined(ARDUINO_TEENSY40)
-  const char *uC = "with Teensy 4.0";
+char boardRevision[20] = "Hardware Revision X";   // will be corrected during init ofVS1053B
+
+// hardware specific settings
+#if defined(__MKL26Z64__)               // Teensy LC
+  const char *uC = "Teensy LC";
+#elif defined(__MK20DX256__)            // Teensy 3.1 / 3.2
+  const char *uC = "Teensy 3.1 / 3.2";
+#elif defined(ARDUINO_TEENSY40)         // Teensyt 4.0
+  const char *uC = "Teensy 4.0";
 #endif
 
 #include <Arduino.h>
@@ -45,16 +47,20 @@ Projector projector;
 UI ui;
 
 #define DISPLAY_DIM_AFTER   10s
-#define DISPLAY_CLEAR_AFTER 20s//5min
+#define DISPLAY_CLEAR_AFTER 5min
 uint8_t myState = MENU_MAIN;
 
 void setup(void) {
 
-  #ifdef SERIALDEBUG
-  Serial.begin(9600);
+  // Initialize serial interface (see serialdebug.h)
+  #ifdef MYSERIAL
+  MYSERIAL.begin(31250);
   #endif
 
-  PRINTF("Welcome to %s\n\n",uCVersion);
+  // Say hi
+  PRINT("Welcome to ");
+  PRINTLN(uCVersion);
+  PRINTLN("");
 
   // set pin mode
   pinMode(LED_BUILTIN, OUTPUT);
@@ -148,11 +154,7 @@ void loop(void) {
     break;
 
   case MENU_EXTRAS:
-    #ifdef SERIALDEBUG
-    myState += u8g2->userInterfaceSelectionList("Extras", 1, (Serial) ? extras_menu_serial : extras_menu);
-    #else
     myState += u8g2->userInterfaceSelectionList("Extras", 1, extras_menu);
-    #endif
     break;
 
   case MENU_EXTRAS_VERSION:
@@ -173,7 +175,7 @@ void loop(void) {
     myState = MENU_MAIN;
     break;
 
-  #ifdef SERIALDEBUG
+#if defined(SERIALDEBUG) || defined(HWSERIALDEBUG)
   case MENU_EXTRAS_DUMP_EEPROM:
     projector.e2dump();
     myState = MENU_MAIN;

@@ -19,8 +19,9 @@ class Audio : public Adafruit_VS1053_FilePlayer {
     static void countISR();
     static void leaderISR();
   private:
+    int32_t average(int32_t);
     void speedControlPID();
-    bool connected();
+    static bool connected();
     uint16_t _fsPhysical = 0;
     char _filename[11] = {0};
     uint8_t _fps = 0;

@@ -143,7 +143,7 @@ void Projector::e2save(uint8_t idx, EEPROMstruct &data) {
 
 
 void Projector::e2dump(void) {
-  #ifdef SERIALDEBUG
+  #if defined(SERIALDEBUG) || defined(HWSERIALDEBUG)
   char buffer[16];
   for (uint16_t address = 0; address <= EEPROM_BYTES_REQUIRED; address += 16) {
     EEPROM.get(address, buffer);                                // get data from EEPROM
