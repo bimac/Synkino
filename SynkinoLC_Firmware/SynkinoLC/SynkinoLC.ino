@@ -107,6 +107,7 @@ void setup(void) {
 }
 
 void PULSE_ISR() {
+  noInterrupts();
   if (digitalReadFast(IMPULSE)) {
     digitalWriteFast(LED_BUILTIN, HIGH);
     buzzer.play(4400);
@@ -114,6 +115,7 @@ void PULSE_ISR() {
     digitalWriteFast(LED_BUILTIN, LOW);
     buzzer.quiet();
   }
+  interrupts();
 }
 
 void loop(void) {
