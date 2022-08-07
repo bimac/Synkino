@@ -1,5 +1,6 @@
 #pragma once
 #include <Adafruit_VS1053.h>
+#include <QuickPID.h>
 
 class Audio : public Adafruit_VS1053_FilePlayer {
   public:
@@ -19,6 +20,8 @@ class Audio : public Adafruit_VS1053_FilePlayer {
     static void countISR();
     static void leaderISR();
   private:
+    QuickPID myPID = QuickPID(&Input, &Output, &Setpoint);
+    float Setpoint, Input, Output;
     int32_t average(int32_t);
     void speedControlPID();
     static bool connected();

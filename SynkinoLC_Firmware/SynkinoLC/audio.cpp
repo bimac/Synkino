@@ -8,6 +8,12 @@
 using namespace TeensyTimerTool;
 #include <QuickPID.h>
 
+// Add patches.053 to flash?
+#ifdef INC_PATCHES
+  #include <incbin.h>
+  INCBIN(Patch, "patches.053");
+#endif
+
 // some synonyms for backward compatibility
 #define SCI_MODE            VS1053_REG_MODE
 #define SCI_STATUS          VS1053_REG_STATUS
@@ -42,12 +48,6 @@ using namespace TeensyTimerTool;
 #define SHUTDOWN               250
 #define QUIT                   255
 
-// Add patches.053 to flash?
-#ifdef INC_PATCHES
-  #include <incbin.h>
-  INCBIN(Patch, "patches.053");
-#endif
-
 extern UI ui;
 extern Projector projector;
 
@@ -64,17 +64,11 @@ unsigned int impToSamplerateFactor;
 int deltaToFramesDivider;
 unsigned int impToAudioSecondsDivider;
 
-float Setpoint, Input, Output;
-QuickPID myPID(&Input, &Output, &Setpoint, 8.0, 3.0, 1.0,
-               myPID.pMode::pOnMeas,
-               myPID.dMode::dOnMeas,
-               myPID.iAwMode::iAwClamp,
-               myPID.Action::direct);
-
 // Constructor
 Audio::Audio(int8_t rst, int8_t cs, int8_t dcs, int8_t dreq, int8_t cardCS, uint8_t SDCD)
     : Adafruit_VS1053_FilePlayer{ rst, cs, dcs, dreq, cardCS }
     , _SDCD { SDCD }, _SDCS { (uint8_t) cardCS } {
+
   pinMode(_SDCD, INPUT_PULLUP);
 }
 
@@ -113,6 +107,12 @@ uint8_t Audio::begin() {
     //
     //    Meh.
     //
+    // Possible solution 3: noInterrupts() / interrupts()?
+    //
+    //    Check.
+    //
+    // Possible solution 4: use sei() in
+    //
     // For reference, see schematics at https://www.pjrc.com/teensy/schematic.html
 
   #elif defined(__MK20DX256__)                    // Teensy 3.2 [MK20DX256]
@@ -122,7 +122,8 @@ uint8_t Audio::begin() {
     //    Pin 03 = STARTMARK -> Port A12 / IRQ 87
 
   #elif defined(ARDUINO_TEENSY40)                 // Teensy 4.0 [IMXRT1052]
-    // ?
+    // Might not work either.
+    // See https://forum.pjrc.com/threads/59828-Teensy-4-Set-interrupt-priority-on-given-pins
   #endif
 
   return 0;                                       // return false (no error)
@@ -141,7 +142,7 @@ void Audio::countISR() {
   static unsigned long lastMicros = 0;
   unsigned long thisMicros = micros();
 
-  if ((micros()-lastMicros) > 2000) {             // poor man's debounce - no periods below 2ms (500Hz)
+  if ((thisMicros - lastMicros) > 2000) {         // poor man's debounce - no periods below 2ms (500Hz)
     totalImpCounter++;
     lastMicros = thisMicros;
     digitalToggleFast(LED_BUILTIN);               // toggle the LED
@@ -153,26 +154,26 @@ bool Audio::selectTrack() {
   EEPROMstruct pConf = projector.config();        // get projector configuration
   uint8_t state = CHECK_FOR_LEADER;
 
-  // 1. Indicate state of start mark detector by means of LED
+  // 1. Indicate state of start using LED
   leaderISR();
   attachInterrupt(STARTMARK, leaderISR, CHANGE);
 
   // 2. Pick a file and run a few checks
-  _trackNum = selectTrackScreen();                // pick a track number
+  _trackNum = selectTrackScreen();                            // pick a track number
   if (_trackNum==0)
-    return true;                                  // back to main-menu
-  if (!loadTrack())                               // try to load track
-    return ui.showError("File not found.");       // back to track selection
-  if (!connected())                               // check if audio cable is plugged in
+    return true;                                              // back to main-menu
+  if (!loadTrack())                                           // try to load track
+    return ui.showError("File not found.");                   // back to track selection
+  if (!connected())                                           // check if audio is plugged in
     return ui.showError("Please connect audio device.");
-  if (!digitalReadFast(STARTMARK)) {              // check for leader
+  if (!digitalReadFast(STARTMARK)) {                          // check for leader
     if (ui.userInterfaceMessage("Can't detect film leader.",
                                 "Use manual start?", "",
                                 " Cancel \n Yes ") == 2) {
       state = OFFER_MANUAL_START;
       detachInterrupt(STARTMARK);
     } else
-      return true;                                // back to main-menu
+      return true;                                            // back to main-menu
   }
 
   // 3. Cue file and activate resampler
@@ -200,6 +201,9 @@ bool Audio::selectTrack() {
 
   // 4. Prepare PID
   myPID.SetMode(myPID.Control::timer);
+  myPID.SetProportionalMode(myPID.pMode::pOnMeas);
+  myPID.SetDerivativeMode(myPID.dMode::dOnMeas);
+  myPID.SetAntiWindupMode(myPID.iAwMode::iAwClamp);
   myPID.SetTunings(pConf.p, pConf.i, pConf.d);
   switch (_fsPhysical) {
     case 22050: myPID.SetOutputLimits(-400000, 600000); break;  // 17% - 227%

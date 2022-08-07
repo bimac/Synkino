@@ -31,12 +31,12 @@ bool Projector::load(uint8_t idx) {
 
   // Print details to serial
   PRINTF("\nUsing projector #%d:\n",idx);
-  PRINTF("   Name:              %s\n",config_.name);
-  PRINTF("   Shutter Blades:    %d\n",config_.shutterBladeCount);
-  PRINTF("   Start Mark Offset: %d frames\n",config_.startmarkOffset);
-  PRINTF("   Proportional:      %d\n",config_.p);
-  PRINTF("   Integral:          %d\n",config_.i);
-  PRINTF("   Derivative:        %d\n\n",config_.d);
+  PRINTF("  Name:              %s\n",config_.name);
+  PRINTF("  Shutter Blades:    %d\n",config_.shutterBladeCount);
+  PRINTF("  Start Mark Offset: %d frames\n",config_.startmarkOffset);
+  PRINTF("  Proportional:      %d\n",config_.p);
+  PRINTF("  Integral:          %d\n",config_.i);
+  PRINTF("  Derivative:        %d\n\n",config_.d);
   return true;
 }
 
