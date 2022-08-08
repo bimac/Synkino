@@ -19,7 +19,7 @@ When assembling SynkinoLC, you can chose between using a Teensy LC or Teensy 3.2
 * The binary patch file for the VS1053b audio decoder (```patches.053```) cannot be included with the firmware and needs to be supplied by means of the microSD-card.
 * You can store settings for "only" 7 projectors (vs 15 on Teensy 3.2).
 * The USB stack has been omitted - you can't use debugging by means of USBSerial. You can, however, use the Teensy's HW serial interface (TX on pin 1, 31250 baud).
-* SdFat is running in low-mem mode (no support for FAT32, limited to 32GB cards and 64 character filenames).
+* SdFat is running in low-mem mode (no support for exFAT, limited to 32GB cards and 64 character filenames).
 
 Neither of these limitations should have a significant impact on the usability of SynkinoLC.
 
