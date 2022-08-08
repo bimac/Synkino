@@ -9,7 +9,7 @@ This is a fork of [fwachsmuth/Synkino](https://github.com/fwachsmuth/Synkino) wi
 * The firmware has been optimized to fit the 62K flash of the affordable but powerful Teensy LC microcontroller board (with a few limitations - see below). Teensy 3.2 is also supported.
 * Unlike the original Synkino, SynkinoLC is not designed for battery operation. Use any micro-USB phone charger as a power supply unit.
 
-Apart from these changes, [Friedemann's manual for the original Synkino](https://www.filmkorn.org/synkino-instruction-manual/?lang=en) should apply for SynkinoLC as well.
+Most parts of [Friedemann's manual for the original Synkino](https://www.filmkorn.org/synkino-instruction-manual/?lang=en) apply for SynkinoLC as well.
 
 
 ## Teensy LC vs Teensy 3.2
