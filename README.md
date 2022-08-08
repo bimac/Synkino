@@ -57,7 +57,7 @@ Just connect the display module to the respective slot on the SynkinoLC PCB - th
 You'll need the following components to assemble SynkinoLC:
 
 | Qty | Part                                                                                               | Description / Comment                     |
-| :-: | :------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| :-: | :------------------------------------------------------------------------------------------------- | :---------------------------------------- |
 |  1  | SynkinoLC PCB                                                                                      |                                           |
 |  1  | 1.3" 128x64 monochrome OLED display, SPI                                                           | see separate comments above               |
 |  1  | [Teensy-LC](https://octopart.com/dev-13305-sparkfun-66786787)                                      | microcontroller board                     |
