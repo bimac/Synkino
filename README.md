@@ -77,4 +77,4 @@ You'll need the following components to assemble SynkinoLC:
 |  1  | [Adam Tech PH1-08-UA](https://octopart.com/ph1-08-ua-adam+tech-13205589) (or similar)              | 8 pos male header (for SSD1306 display)   |
 |  2  | [Adam Tech PH1-14-UA](https://octopart.com/ph1-14-ua-adam+tech-14467007) (or similar)              | 14 pos male header                        |
 
-Click [here](https://octopart.com/bom-tool/omFmd0tC) for a full BOM on [octopart.com](https://octopart.com). All necessary components should be obtainable for about €83 (including shipping, not including the PCB), if you opt for a cheap SH1106 display you can get it for less.
+Click [here](https://octopart.com/bom-tool/omFmd0tC) for a full BOM on [octopart.com](https://octopart.com) (with SSD1306 display and not including the PCB). All necessary components should be obtainable for about USD/EUR 80-100 including shipping - depending on your choice of display and PCB service.
