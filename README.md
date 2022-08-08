@@ -61,7 +61,7 @@ You'll need the following components to assemble SynkinoLC:
 |  1  | SynkinoLC PCB                                                                                      |                                           |
 |  1  | 1.3" 128x64 monochrome OLED display, SPI                                                           | see separate comments above               |
 |  1  | [Teensy-LC](https://octopart.com/dev-13305-sparkfun-66786787)                                      | microcontroller board                     |
-|  1  | [Adafruit VS1053 Codec + MicroSD Breakout](https://octopart.com/1381-adafruit+industries-32978404) |                                           |
+|  1  | [Adafruit VS1053 Codec + MicroSD Breakout](https://octopart.com/1381-adafruit+industries-32978404) | audio processing board                    |
 |  1  | [Texas Instruments SN74AHC14N](https://octopart.com/sn74ahc14n-texas+instruments-465338)           | inverted Schmitt-trigger                  |
 |  2  | [SparkFun ROB-09453](https://octopart.com/rob-09453-sparkfun-67069573)                             | line sensor breakout (analog)             |
 |  1  | [Bourns PEC11L-4215F-S0015](https://octopart.com/pec11l-4215f-s0015-bourns-25517430)               | rotary encoder                            |
@@ -77,4 +77,4 @@ You'll need the following components to assemble SynkinoLC:
 |  1  | [Adam Tech PH1-08-UA](https://octopart.com/ph1-08-ua-adam+tech-13205589) (or similar)              | 8 pos male header (for SSD1306 display)   |
 |  2  | [Adam Tech PH1-14-UA](https://octopart.com/ph1-14-ua-adam+tech-14467007) (or similar)              | 14 pos male header                        |
 
-Click [here](https://octopart.com/bom-tool/omFmd0tC) for a full BOM on [octopart.com](https://octopart.com). All necessary components should be obtainable for about USD60 / EUR60 (not including the PCB).
+Click [here](https://octopart.com/bom-tool/omFmd0tC) for a full BOM on [octopart.com](https://octopart.com). All necessary components should be obtainable for about €83 (including shipping, not including the PCB), if you opt for a cheap SH1106 display you can get it for less.
