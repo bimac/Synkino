@@ -30,7 +30,7 @@ SynkinoLC was created with [PlatformIO](https://docs.platformio.org/en/latest/wh
 
 1. [Download](https://code.visualstudio.com/) and install official Microsoft Visual Studio Code. PlatformIO IDE is built on top of it.
 2. Open VSCode Package Manager.
-3. Search for the official PlatformIO ide extension.
+3. Search for the official PlatformIO IDE extension.
 4. Install PlatformIO IDE.
 
 See [the official guide](https://docs.platformio.org/en/latest/integration/ide/vscode.html) for more details on the VSCode integration.
