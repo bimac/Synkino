@@ -46,7 +46,7 @@ The firmware won't fit TeensyLC unless you modify ```SD.h``` as outlined [here](
 ## Choice of OLED display
 
 SynkinoLC has been designed to work with two types of 1.3" OLED display, based on either SH1106 or SSD1306 driver chips:
-* The SH1106 (as used in the original Synkino) can be obtained for little money on [aliexpress.com](https://aliexpress.com/wholesale?SearchText=sh1106+128+64) (go for the one that says ```1.30"OLED 4-SPI``` on the back). Other SH1106 modules should work as well, as long as they have identical pin-out (the foot-print for the retaining screws might not be an exact fit though).
+* An SH1106 display module (as used in the original Synkino) can be obtained for little money on [aliexpress.com](https://aliexpress.com/wholesale?SearchText=sh1106+128+64) (go for the one that says ```1.30"OLED 4-SPI``` on the back). Other SH1106 modules should work as well, as long as they have identical pin-out (the foot-print for the retaining screws might not be an exact fit though).
 * Alternatively, you can go for [Adafruit #938](https://octopart.com/938-adafruit+industries-32979003) which is based on an SSD1306 driver (you'll have to cut two traces on the back of the module to enable SPI as demonstrated [here](https://www.youtube.com/watch?v=SXfV4e_jpf8))
 
 Just connect the display module to the respective slot on the SynkinoLC PCB - the firmware will automatically detect the type of display used.
