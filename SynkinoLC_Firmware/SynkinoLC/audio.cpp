@@ -53,7 +53,10 @@ using namespace TeensyTimerTool;
 #define WAIT_FOR_STARTMARK       2
 #define START                    3
 #define PLAYING                  4
-#define SHUTDOWN               250
+#define PAUSE                    5
+#define PAUSED                   6
+#define RESUME                   7
+#define SHUTDOWN               254
 #define QUIT                   255
 
 extern UI ui;
@@ -61,16 +64,7 @@ extern Projector projector;
 
 bool runPID = false;
 PeriodicTimer pidTimer(TCK);
-
-// PID
-volatile unsigned long totalImpCounter = 0;
-int32_t syncOffsetImps = 0;
-bool sampleCountRegisterValid = true;
-unsigned long sampleCountBaseLine = 0;
-
-unsigned int impToSamplerateFactor;
-int deltaToFramesDivider;
-unsigned int impToAudioSecondsDivider;
+volatile uint32_t totalImpCounter = 0;
 
 // Constructor
 Audio::Audio() : Adafruit_VS1053_FilePlayer{VS1053_RST, VS1053_CS, VS1053_DCS, VS1053_DREQ, VS1053_SDCS} {
@@ -189,14 +183,9 @@ bool Audio::selectTrack() {
   delay(500);                         // wait for pause
   setVolume(4,4);                     // raise volume back up for playback
 
-  impToSamplerateFactor = _fsPhysical / _fps / pConf.shutterBladeCount;
-  deltaToFramesDivider = _fsPhysical / _fps;
+  impToSamplerateFactor    = _fsPhysical / _fps / pConf.shutterBladeCount;
+  deltaToFramesDivider     = _fsPhysical / _fps;
   impToAudioSecondsDivider = _fps * pConf.shutterBladeCount;
-  // pausePlaying(false);
-  // while (true) {
-  //   delay(100);
-  //   PRINTF("%d kbps\n", getBitrate());
-  // }
 
   // 4. Prepare PID
   myPID.SetMode(myPID.Control::timer);
@@ -260,10 +249,30 @@ bool Audio::selectTrack() {
       if (runPID) {
         speedControlPID();
         runPID = false;
+        state  = handlePause();
       }
       drawPlayingMenu();
-      if (!playingMusic)
+      if (stopped())
         state = SHUTDOWN;
+      break;
+
+    case PAUSE:
+      pausePlaying(true);
+      PRINTLN("Paused Playback.");
+      pidTimer.stop();
+      state = PAUSED;
+      break;
+
+    case PAUSED:
+      drawPlayingMenu();
+      state = handlePause();
+      break;
+
+    case RESUME:
+      pausePlaying(false);
+      PRINTLN("Resumed Playback.");
+      pidTimer.start();
+      state = PLAYING;
       break;
 
     case SHUTDOWN:
@@ -273,8 +282,48 @@ bool Audio::selectTrack() {
       state = QUIT;
     }
   }
+  u8g2->setFont(FONT10);
   return true;
 }
+
+uint8_t Audio::handlePause() {
+  static uint16_t pauseDetectedPeriod = (1000 / _fps * 3);
+  static uint32_t prevTotalImpCounter = 0;
+  static uint32_t lastImpMillis;
+
+  bool impsChanged = (totalImpCounter + syncOffsetImps) != prevTotalImpCounter;
+
+  if (paused()) {
+    if (impsChanged)
+      return RESUME;
+    else
+      return PAUSED;
+  } else {
+    if (impsChanged && !paused()) {
+      prevTotalImpCounter = totalImpCounter + syncOffsetImps;
+      lastImpMillis = millis();
+    } else if ((millis() - lastImpMillis) >= pauseDetectedPeriod) {
+      //lastSampleCounterHaltPos = Read32BitsFromSCI(0x1800);
+      //myPID.SetMode(MANUAL);
+      //lastImpCounterHaltPos = totalImpCounter + syncOffsetImps;
+      return PAUSE;
+    }
+    return PLAYING;
+  }
+}
+
+// uint8_t Audio::waitForResumeToPlay(unsigned long impCounterStopPos) {
+//   static uint32_t prevTotalImpCounter = 0;
+//   if ((totalImpCounter + syncOffsetImps) == impCounterStopPos) {
+//     return;
+//   } else {
+//     myPID.SetMode(AUTOMATIC);
+//     restoreSampleCounter(lastSampleCounterHaltPos);
+//     musicPlayer.resumeMusic();
+//     tellFrontend(CMD_PROJ_PLAY, 0);
+//     myState = PLAYING;
+//   }
+// }
 
 void Audio::speedControlPID() {
   uint32_t actualSampleCount = getSampleCount() - sampleCountBaseLine;
@@ -309,11 +358,11 @@ void Audio::drawPlayingMenuConstants() {
   u8g2->setFont(FONT10);
 }
 
-void Audio::drawPlayingMenuStatus(bool isPlaying) {
-  if (isPlaying)
-    u8g2->drawXBMP(60, 54, play_xbm_width, play_xbm_height, play_xbm_bits);
-  else
+void Audio::drawPlayingMenuStatus() {
+  if (paused())
     u8g2->drawXBMP(60, 54, pause_xbm_width, pause_xbm_height, pause_xbm_bits);
+  else
+    u8g2->drawXBMP(60, 54, play_xbm_width, play_xbm_height, play_xbm_bits);
 }
 
 void Audio::drawWaitForPlayingMenu() {
@@ -321,7 +370,7 @@ void Audio::drawWaitForPlayingMenu() {
   drawPlayingMenuConstants();
   ui.drawCenteredStr(28, "Waiting for");
   ui.drawCenteredStr(46, "Film to Start");
-  drawPlayingMenuStatus(false);
+  drawPlayingMenuStatus();
   u8g2->sendBuffer();
 }
 
@@ -354,7 +403,7 @@ void Audio::drawPlayingMenu() {
   if (ss < 10) u8g2->print("0");
   u8g2->print(ss);
 
-  // drawPlayingMenuStatus(!projectorPaused);
+  drawPlayingMenuStatus();
 
   // draw sync status
   if (_frameOffset == 0)

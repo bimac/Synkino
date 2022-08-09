@@ -65,7 +65,7 @@ You'll need the following components to assemble SynkinoLC:
 |  1  | [Texas Instruments SN74AHC14N](https://octopart.com/sn74ahc14n-texas+instruments-465338)           | inverted Schmitt-trigger                  |
 |  2  | [SparkFun ROB-09453](https://octopart.com/rob-09453-sparkfun-67069573)                             | line sensor breakout (analog)             |
 |  1  | [Bourns PEC11L-4215F-S0015](https://octopart.com/pec11l-4215f-s0015-bourns-25517430)               | rotary encoder                            |
-|  1  | [Cliff CL170849BR](https://octopart.com/cl170849br-cliff-22810934) (or similar)                    | knob for rotary encoder                   |
+|  1  | [Cliff CL170842CR](https://octopart.com/cl170842cr-cliff-22810928) (or similar)                    | knob for rotary encoder                   |
 |  1  | [TDK PS1240P02BT](https://octopart.com/ps1240p02bt-tdk-8602108)                                    | piezo buzzer                              |
 |  2  | [CUI Devices SJ1-2503A](https://octopart.com/sj1-2503a-cui+devices-106235597)                      | 2.5mm audio jack                          |
 |  2  | [Tensility CA-2203](https://octopart.com/ca-2203-tensility-19254819)  (or similar)                 | 2.5mm audio cable, stereo                 |
