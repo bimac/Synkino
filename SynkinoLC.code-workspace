@@ -7,7 +7,7 @@
 		{
 			"name": "SynkinoLC Firmware",
 			"path": "SynkinoLC_Firmware"
-		}
+		},
 	],
 	"settings": {
 		"files.associations": {
@@ -33,7 +33,10 @@
 			"streambuf": "cpp",
 			"chrono": "cpp",
 			"typeinfo": "cpp",
-			"fstream": "cpp"
+			"fstream": "cpp",
+			"algorithm": "cpp",
+			"random": "cpp",
+			"climits": "cpp"
 		}
 	}
 }

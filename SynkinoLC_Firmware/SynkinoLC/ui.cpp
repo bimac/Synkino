@@ -1,5 +1,6 @@
 #include "ui.h"
 #include "buzzer.h"
+#include "serialdebug.h"
 
 UI::UI(void) {}
 

@@ -1,36 +1,27 @@
-const char *uCVersion = "SynkinoLC v1.0 alpha";
-char boardRevision[20] = "Hardware Revision X";   // will be corrected during init ofVS1053B
-
-// hardware specific settings
-#if defined(__MKL26Z64__)               // Teensy LC
+const char *uCVersion  = "SynkinoLC v1.0 alpha";
+char boardRevision[20] = "Hardware Revision X";   // will be corrected during initialization of VS1053B
+#if defined(__MKL26Z64__)
   const char *uC = "Teensy LC";
-#elif defined(__MK20DX256__)            // Teensy 3.1 / 3.2
+#elif defined(__MK20DX256__)
   const char *uC = "Teensy 3.1 / 3.2";
-#elif defined(ARDUINO_TEENSY40)         // Teensyt 4.0
+#elif defined(ARDUINO_TEENSY40)
   const char *uC = "Teensy 4.0";
 #endif
 
 #include <Arduino.h>
 #include <U8g2lib.h>
-#include <EEPROM.h>
-
-#include "TeensyTimerTool.h"
+#include "TeensyTimerTool.h"      // hard- and software timers on teensy boards
 using namespace TeensyTimerTool;
-
 #include <EncoderTool.h>
 using namespace EncoderTool;
 
+#include "serialdebug.h"  // macros for serial debugging
+#include "ui.h"           // some UI methods of general use
 #include "audio.h"        // all things audio (derived from Adafruit_VS1053_FilePlayer)
 #include "buzzer.h"       // the buzzer and some helper methods
 #include "projector.h"    // management of the projector configuration & EEPROM storage
-#include "ui.h"           // some UI methods of general use
-#include "serialdebug.h"  // macros for serial debugging
 #include "pins.h"         // pin definitions
-
 #include "menus.h"        // menu definitions, positions of menu items
-//#include "states.h"       // state definitions
-//#include "timeconst.h"    // useful time constants and macros
-#include "vars.h"         // initialization of constants and vars
 
 // Initialize Objects
 Audio musicPlayer;

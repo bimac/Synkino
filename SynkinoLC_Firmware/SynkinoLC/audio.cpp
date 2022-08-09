@@ -85,11 +85,13 @@ uint8_t Audio::begin() {
   PRINTLN("Initializing VS1053B ...");
   if (!Adafruit_VS1053_FilePlayer::begin())       // initialize base class
     return 2;
+  useInterrupt(VS1053_FILEPLAYER_PIN_INT);        // use VS1053 DREQ interrupt
 
   if (!loadPatch())                               // load & apply patch
     return 3;
+  enableResampler();                              // enable 15/16 resampler
 
-  useInterrupt(VS1053_FILEPLAYER_PIN_INT);        // use VS1053 DREQ interrupt
+
 
   // the DREQ interrupt seems to mess with the timing of the impulse detection
   // which is also using an interrupt. This can be remidied by lowering the
@@ -148,7 +150,7 @@ bool Audio::selectTrack() {
   EEPROMstruct pConf = projector.config();        // get projector configuration
   uint8_t state = CHECK_FOR_LEADER;
 
-  // 1. Indicate state of start using LED
+  // 1. Indicate presence of film leader using LED
   leaderISR();
   attachInterrupt(STARTMARK, leaderISR, CHANGE);
 
@@ -170,23 +172,22 @@ bool Audio::selectTrack() {
       return true;                                            // back to main-menu
   }
 
-  // 3. Cue file and activate resampler
+  // 3. Cue file
   ui.drawBusyBee(90, 10);
   PRINT("Loading \"");
   PRINT(_filename);
   PRINTLN("\"");
-  setVolume(254,254);                             // mute
-  startPlayingFile(_filename);                    // start playback
-  while (getSamplingRate()==8000) {}              // wait for correct data
-  _fsPhysical = getSamplingRate();                // get physical sampling rate
-  pausePlaying(true);                             // and pause again
+  setVolume(254,254);                 // mute
+  clearSampleCounter();
+  startPlayingFile(_filename);        // start playback
+  while (getSamplingRate()==8000) {}  // wait for correct data
+  _fsPhysical = getSamplingRate();    // get physical sampling rate
+  pausePlaying(true);                 // and pause again
   PRINT("Sampling rate: ");
   PRINT(_fsPhysical);
   PRINTLN(" Hz");
-  enableResampler();
-  delay(500);                                     // wait for pause
-  setVolume(4,4);                                 // raise volume back up for playback
-  clearSampleCounter();
+  delay(500);                         // wait for pause
+  setVolume(4,4);                     // raise volume back up for playback
 
   impToSamplerateFactor = _fsPhysical / _fps / pConf.shutterBladeCount;
   deltaToFramesDivider = _fsPhysical / _fps;
@@ -212,29 +213,34 @@ bool Audio::selectTrack() {
   }
 
   // 5. Run state machine
-  PRINTLN("Waiting for start mark ...");
-
   while (state != QUIT) {
     yield();
 
     switch (state) {
     case CHECK_FOR_LEADER:
       if (digitalReadFast(STARTMARK)) {
-        state = WAIT_FOR_STARTMARK;
+        PRINT("Waiting for start mark ... ");
         drawWaitForPlayingMenu();
+        state = WAIT_FOR_STARTMARK;
       } else
         state = OFFER_MANUAL_START;
       break;
 
     case OFFER_MANUAL_START:
+      // TO IMPLEMENT
+      state = QUIT;
       break;
 
     case WAIT_FOR_STARTMARK:
       if (digitalReadFast(STARTMARK))
         continue; // there is still leader
-      PRINTLN("Hit start mark!");
+      PRINTLN("Hit!");
+      PRINT("Waiting for ");
+      PRINT(pConf.startmarkOffset);
+      PRINTLN(" frames ...");
       totalImpCounter = 0;
       detachInterrupt(STARTMARK);
+      digitalWriteFast(LED_BUILTIN, LOW);
       attachInterrupt(IMPULSE, countISR, RISING); // start impulse counter
       state = START;
       break;
@@ -244,9 +250,8 @@ bool Audio::selectTrack() {
         continue;
       totalImpCounter = 0;
       pausePlaying(false);
-      clearSampleCounter();
-      sampleCountBaseLine = read32BitsFromSCI(0x1800);
-      PRINTLN("Start!");
+      PRINTLN("Started Playback.");
+      sampleCountBaseLine = getSampleCount();
       pidTimer.begin([]() { runPID = true; }, 10_Hz);
       state = PLAYING;
       break;
@@ -257,31 +262,39 @@ bool Audio::selectTrack() {
         runPID = false;
       }
       drawPlayingMenu();
+      if (!playingMusic)
+        state = SHUTDOWN;
       break;
 
     case SHUTDOWN:
       stopPlaying();
       PRINTLN("Stopped Playback.");
+      detachInterrupt(IMPULSE);
       state = QUIT;
     }
   }
-  detachInterrupt(IMPULSE);
-
-
-  // projector.config().shutterBladeCount * projector.config().startmarkOffset
-  clearSampleCounter();
-  //sampleCountBaseLine = read32BitsFromSCI(0x1800);
-
-
-  // pauseDetectedPeriod = (1000 / fps * 3);
-  // sampleCountRegisterValid = true;           // It takes 8 KiB until the Ogg Sample Counter is valid for sure
-  // impToSamplerateFactor = physicalSamplingrate / fps / shutterBlades / 2;
-  // deltaToFramesDivider = physicalSamplingrate / fps;
-  // impToAudioSecondsDivider = sollfps * shutterBlades * 2;
-
-
-
   return true;
+}
+
+void Audio::speedControlPID() {
+  uint32_t actualSampleCount = getSampleCount() - sampleCountBaseLine;
+  int32_t desiredSampleCount = (totalImpCounter + syncOffsetImps) * impToSamplerateFactor;
+  long delta = (actualSampleCount - desiredSampleCount);
+
+  Input = average(delta);
+  myPID.Compute();
+  adjustSamplerate(Output);
+
+  _frameOffset = Input / deltaToFramesDivider;
+
+  //This puts nifty CSV to the Console, to graph PID results.
+  //PRINTF("Delta:%d,Average:%f,FrameOffset: %d\n", delta, Input, _frameOffset);
+  //PRINTF("Input:%0.3f,Output:%0.3f\n", Input, Output);
+  //PRINTF("P:%0.5f,I:%0.5f,D:%0.5f\n", myPID.GetPterm(), myPID.GetIterm(), myPID.GetDterm());
+
+// if (musicPlayer.isPlaying() == 0) // and/or musicPlayer.getState() == 4
+//   resetAudio();
+
 }
 
 void Audio::drawPlayingMenuConstants() {
@@ -416,58 +429,21 @@ void handleFrameCorrectionOffsetInput() {
   // u8g2.setFont(u8g2_font_helvR10_tr);   // Only until we go to the PLAYING_MENU here
 }
 
-void Audio::speedControlPID() {
-  // static unsigned long lastMillis = millis();
-  // if (millis() - lastMillis < 10)
-  //   return;
-
-  // static unsigned long prevTotalImpCounter;
-  static unsigned long previousActualSampleCount;
-  // if (totalImpCounter + syncOffsetImps != prevTotalImpCounter) {
-
-    //if (sampleCountRegisterValid) {
-      unsigned long actualSampleCount = read32BitsFromSCI(0x1800) - sampleCountBaseLine;
-      previousActualSampleCount = actualSampleCount;
-      if (actualSampleCount < previousActualSampleCount)
-        actualSampleCount = previousActualSampleCount;
-
-      long desiredSampleCount = (totalImpCounter + syncOffsetImps) * impToSamplerateFactor;
-      long delta = (actualSampleCount - desiredSampleCount);
-
-      Input = (float) average(delta);
-      myPID.Compute();
-      adjustSamplerate((long) Output);
-
-      // prevTotalImpCounter = totalImpCounter + syncOffsetImps;
-
-      _frameOffset = (long) Input / deltaToFramesDivider;
-      //PRINTF("Delta:%d,Average:%f,FrameOffset: %d\n", delta, Input, _frameOffset);
-      //PRINTF("Input:%0.3f,Output:%0.3f\n", Input, Output);
-      //PRINTF("P:%0.5f,I:%0.5f,D:%0.5f\n",myPID.GetPterm(),myPID.GetIterm(),myPID.GetDterm());
-
-    //}
-    // if (musicPlayer.isPlaying() == 0) // and/or musicPlayer.getState() == 4
-    //   resetAudio();
-  // }
-}
-
 int32_t Audio::average(int32_t input) {
-  #define numReadings 6
+  #define numReadings 6                       // window size for sliding average
   static int32_t readings[numReadings] = {0};
   static int32_t total = 0;
   static uint8_t readIdx = 0;
 
-  readIdx = (readIdx + 1) % numReadings;  // update array index
-  total = total - readings[readIdx];      // subtract previous reading from running total
-  readings[readIdx] = input;              // store new reading to array
-  total += input;                         // add new reading to running total
-  int32_t average = total / numReadings;  // calculate the average
-
-  return average;
+  readIdx = (readIdx + 1) % numReadings;      // update array index
+  total = total - readings[readIdx];          // subtract previous reading from running total
+  readings[readIdx] = input;                  // store new reading to array
+  total += input;                             // add new reading to running total
+  return total / numReadings;                 // calculate & return the average
 }
 
 uint16_t Audio::getSamplingRate() {
-  return read16BitsFromSCI(SCI_AUDATA) & 0xfffe;  // Mask the Mono/Stereo Bit
+  return sciRead(SCI_AUDATA) & 0xfffe;    // Mask the Mono/Stereo Bit
 }
 
 bool Audio::loadTrack() {
@@ -553,7 +529,7 @@ bool Audio::loadPatch() {
     }
     file.close();
     if (status) {
-      PRINTLN("done");
+      PRINTLN("done.");
       return status;
     } else
       PRINTLN("error reading file.");
@@ -563,16 +539,18 @@ bool Audio::loadPatch() {
   #ifdef INC_PATCHES
     PRINT("Applying \"patches.053\" from flash ... ");
     applyPatch(reinterpret_cast<const uint16_t *>(gPatchData), gPatchSize / 2);
-    PRINTLN("done");
+    PRINTLN("done.");
     return true;
   #endif
   return false;
 }
 
 void Audio::enableResampler() {
+  // See section 1.6 of
+  // https://www.vlsi.fi/fileadmin/software/VS10XX/vs1053b-patches.pdf
   sciWrite(SCI_WRAMADDR, 0x1e09);
   sciWrite(SCI_WRAM, 0x0080);
-  PRINTLN("15/16 resampling enabled.");
+  PRINTLN("15/16 Resampler enabled.");
 }
 
 void Audio::adjustSamplerate(signed long ppm2) {
@@ -584,10 +562,22 @@ void Audio::adjustSamplerate(signed long ppm2) {
   sciWrite(SCI_AUDATA, sciRead(SCI_AUDATA));
 }
 
+uint32_t Audio::getSampleCount() {
+  // See section 1.3 of
+  // https://www.vlsi.fi/fileadmin/software/VS10XX/vs1053b-patches.pdf
+  return sciRead32(0x1800);
+}
+
 void Audio::clearSampleCounter() {
   sciWrite(SCI_WRAMADDR, 0x1800);
   sciWrite(SCI_WRAM, 0);
   sciWrite(SCI_WRAM, 0);
+}
+
+void Audio::restoreSampleCounter(uint32_t samplecounter) {
+  sciWrite(SCI_WRAMADDR, 0x1800); // MSB
+  sciWrite(SCI_WRAM, samplecounter);
+  sciWrite(SCI_WRAM, samplecounter >> 16);
 }
 
 void Audio::clearErrorCounter() {
@@ -595,27 +585,19 @@ void Audio::clearErrorCounter() {
   sciWrite(SCI_WRAM, 0);
 }
 
-unsigned int Audio::read16BitsFromSCI(unsigned short addr) {
-  return (unsigned int)sciRead(addr);
-}
-
-unsigned long Audio::read32BitsFromSCI(unsigned short addr) {
-  unsigned short msbV1, lsb, msbV2;
-  sciWrite(SCI_WRAMADDR, addr+1);
-  msbV1 = (unsigned int)sciRead(SCI_WRAM);
+uint32_t Audio::sciRead32(uint16_t addr) {
+  // See section 1.3 of
+  // https://www.vlsi.fi/fileadmin/software/VS10XX/vs1053b-patches.pdf
+  u_int16_t msbV1, lsb, msbV2;
+  sciWrite(SCI_WRAMADDR, addr + 1);
+  msbV1 = (u_int16_t)sciRead(SCI_WRAM);
   sciWrite(SCI_WRAMADDR, addr);
-  lsb   = (unsigned long)sciRead(SCI_WRAM);
-  msbV2 = (unsigned int)sciRead(SCI_WRAM);
+  lsb = (u_int32_t)sciRead(SCI_WRAM);
+  msbV2 = (u_int16_t)sciRead(SCI_WRAM);
   if (lsb < 0x8000U) {
     msbV1 = msbV2;
   }
-  return ((unsigned long)msbV1 << 16) | lsb;
-}
-
-void Audio::restoreSampleCounter(unsigned long samplecounter) {
-  sciWrite(SCI_WRAMADDR, 0x1800); // MSB
-  sciWrite(SCI_WRAM, samplecounter);
-  sciWrite(SCI_WRAM, samplecounter >> 16);
+  return ((u_int32_t)msbV1 << 16) | lsb;
 }
 
 uint16_t Audio::getBitrate() {

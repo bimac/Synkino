@@ -1,4 +1,7 @@
+#include <EEPROM.h>
 #include "projector.h"
+#include "ui.h"
+#include "serialdebug.h"
 
 Projector::Projector(void) {}
 
@@ -152,8 +155,8 @@ void Projector::e2save(uint8_t idx, EEPROMstruct &data) {
 }
 
 void Projector::e2dump(void) {
-  // Sorry, I realize this is a mess ...
 #if defined(SERIALDEBUG) || defined(HWSERIALDEBUG)
+  // Sorry, I realize this is an unreadable mess ...
   char bufferInput[16];         // buffer holding data from EEPROM
   char bufferOutput[82] = {0};  // buffer holding data to be printed
   for (uint16_t address = 0; address <= EEPROM_BYTES_REQUIRED; address += 16) {

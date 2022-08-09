@@ -1,9 +1,5 @@
 #pragma once
 
-#include <EEPROM.h>
-#include "ui.h"
-#include "serialdebug.h"
-
 // A few macros for handling of the EEPROM storage
 #define EEPROM_HEADER_BYTES        2
 #define EEPROM_IDX_COUNT           0

@@ -7,30 +7,32 @@ class Audio : public Adafruit_VS1053_FilePlayer {
     Audio(void);
     uint8_t begin();
     bool selectTrack();
-    bool loadPatch();
     bool SDinserted();
-    void enableResampler();
-    void adjustSamplerate(signed long ppm2);
-    void clearSampleCounter();
-    void clearErrorCounter();
-    unsigned int read16BitsFromSCI(unsigned short addr);
-    unsigned long read32BitsFromSCI(unsigned short addr);
-    void restoreSampleCounter(unsigned long samplecounter);
     const char getRevision();
     static void countISR();
     static void leaderISR();
+
   private:
     QuickPID myPID = QuickPID(&Input, &Output, &Setpoint);
     float Setpoint, Input, Output;
-    int32_t average(int32_t);
-    void speedControlPID();
-    static bool connected();
     uint16_t _fsPhysical = 0;
     char _filename[11] = {0};
     uint8_t _fps = 0;
     uint16_t _trackNum = 0;
     int32_t _frameOffset = 0;
+
+    bool loadPatch();
+    void enableResampler();
+    void adjustSamplerate(signed long ppm2);
+    void clearSampleCounter();
+    void clearErrorCounter();
+    uint32_t sciRead32(uint16_t addr);
+    void restoreSampleCounter(uint32_t samplecounter);
+    int32_t average(int32_t);
+    void speedControlPID();
+    static bool connected();
     uint16_t selectTrackScreen();
+    uint32_t getSampleCount();
     void drawPlayingMenuConstants();
     void drawWaitForPlayingMenu();
     void drawPlayingMenu();

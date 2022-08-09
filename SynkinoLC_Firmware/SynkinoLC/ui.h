@@ -5,9 +5,7 @@
 using namespace EncoderTool;
 
 #include "buzzer.h"
-#include "serialdebug.h"
 #include "xbm.h"
-
 #define FONT10 u8g2_font_helvR10_tr
 #define FONT08 u8g2_font_helvR08_tr
 
