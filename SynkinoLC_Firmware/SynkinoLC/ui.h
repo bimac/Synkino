@@ -21,8 +21,7 @@ uint8_t u8x8_GetMenuEvent(u8x8_t);
 class UI {
   public:
     UI(void);
-    static void insertPaddedInt(char*, uint16_t, uint8_t);
-    static void zeroPad(char*, uint16_t, uint8_t, uint8_t);
+    static void insertPaddedInt(char*, uint16_t, uint8_t, uint8_t);
     static void waitForBttnRelease();
     static void drawBusyBee(u8g2_uint_t x, u8g2_uint_t y);
     static uint8_t userInterfaceMessage(const char *, const char *, const char *, const char *);
@@ -41,3 +40,5 @@ class UI {
   private:
     int8_t encDir_ = 1;
 };
+
+extern UI ui;

@@ -22,8 +22,8 @@ using namespace EncoderTool;
 
 #include "audio.h"        // all things audio (derived from Adafruit_VS1053_FilePlayer)
 #include "buzzer.h"       // the buzzer and some helper methods
-#include "projector.h"
-#include "ui.h"
+#include "projector.h"    // management of the projector configuration & EEPROM storage
+#include "ui.h"           // some UI methods of general use
 #include "serialdebug.h"  // macros for serial debugging
 #include "pins.h"         // pin definitions
 
@@ -33,7 +33,7 @@ using namespace EncoderTool;
 #include "vars.h"         // initialization of constants and vars
 
 // Initialize Objects
-Audio musicPlayer(VS1053_RST, VS1053_CS, VS1053_DCS, VS1053_DREQ, VS1053_SDCS, VS1053_SDCD);
+Audio musicPlayer;
 U8G2* u8g2;
 PolledEncoder enc;
 PeriodicTimer encTimer(TCK);
@@ -107,7 +107,6 @@ void setup(void) {
 }
 
 void PULSE_ISR() {
-  noInterrupts();
   if (digitalReadFast(IMPULSE)) {
     digitalWriteFast(LED_BUILTIN, HIGH);
     buzzer.play(4400);
@@ -115,7 +114,6 @@ void PULSE_ISR() {
     digitalWriteFast(LED_BUILTIN, LOW);
     buzzer.quiet();
   }
-  interrupts();
 }
 
 void loop(void) {
@@ -187,130 +185,6 @@ void loop(void) {
   default:
     myState = MENU_MAIN;
   }
-}
-
-void handleFrameCorrectionOffsetInput() {
-  // int16_t parentMenuEncPosition;
-  // parentMenuEncPosition = myEnc.read();
-  // int16_t newEncPosition;
-  // int16_t oldPosition;
-
-  // myEnc.write(16000 + (newSyncOffset << 1));  // this becomes 0 further down after shifting and modulo
-  // while (digitalRead(ENCODER_BTN) == 1) {     // adjust ### as long as button not pressed
-  //   newEncPosition = myEnc.read();
-  //   if (encType == 30) {
-  //     newSyncOffset = ((newEncPosition >> 1) - 8000);
-  //   } else {
-  //     newSyncOffset = ((newEncPosition >> 2) - 4000);
-  //   }
-  //   if (newEncPosition != oldPosition) {
-  //     oldPosition = newEncPosition;
-  //     Serial.println(newSyncOffset);
-  //     u8g2.firstPage();
-  //     do {
-
-  //       // Draw Header & Footer
-  //       u8g2.setFont(u8g2_font_helvR10_tr);
-  //       if (newSyncOffset == 0) {
-  //         u8g2.drawStr(6,12,"Adjust Sync Offset");
-  //       } else if (newSyncOffset < 0) {
-  //         u8g2.drawStr(11,12,"Delay Sound by");
-  //       } else if (newSyncOffset > 0) {
-  //         u8g2.drawStr(6,12,"Advance Sound by");
-  //       }
-  //       u8g2.drawStr(40,64,"Frames");
-
-  //       u8g2.setFont(u8g2_font_inb24_mn);
-  //       if (newSyncOffset >= 0 && newSyncOffset <= 9) {
-  //         u8g2.setCursor(55, 46);
-  //       } else if (newSyncOffset >= -9 && newSyncOffset <= -1) {
-  //         u8g2.setCursor(45, 46);
-  //       } else if (newSyncOffset >= 10 && newSyncOffset <= 99) {
-  //         u8g2.setCursor(45, 46);
-  //       } else if (newSyncOffset >= -99 && newSyncOffset <= -10) {
-  //         u8g2.setCursor(35, 46);
-  //       } else if (newSyncOffset >= 100 && newSyncOffset <= 999) {
-  //         u8g2.setCursor(35, 46);
-  //       } else if (newSyncOffset >= -999 && newSyncOffset <= -100) {
-  //         u8g2.setCursor(25, 46);
-  //       }
-
-  //       u8g2.print(newSyncOffset);
-  //     } while ( u8g2.nextPage() );
-  //   }
-  // }
-
-  // ui.waitForBttnRelease();
-  // oldPosition = 0;
-  // myEnc.write(parentMenuEncPosition);
-  // u8g2.setFont(u8g2_font_helvR10_tr);   // Only until we go to the PLAYING_MENU here
-}
-
-
-// void updateFpsDependencies(uint8_t fps) {
-//   sollfps = fps;                                // redundant? sollfps is global, fps is local. Horrible.
-//   pauseDetectedPeriod = (1000 / fps * 3);
-//   sampleCountRegisterValid = true;           // It takes 8 KiB until the Ogg Sample Counter is valid for sure
-//   impToSamplerateFactor = physicalSamplingrate / fps / shutterBlades / 2;
-//   deltaToFramesDivider = physicalSamplingrate / fps;
-//   impToAudioSecondsDivider = sollfps * shutterBlades * 2;
-// }
-
-void drawPlayingMenuConstants(int trackNo, byte fps) {
-  u8g2->setFont(FONT08);
-  u8g2->drawStr(0, 8, projector.config().name);
-  char buffer[9] = "Film 000";
-  ui.insertPaddedInt(&buffer[5], trackNo, 3);
-  ui.drawRightAlignedStr(8, buffer);
-  itoa(fps, buffer, 10);
-  strcat(buffer, " fps");
-  ui.drawRightAlignedStr(62, buffer);
-  u8g2->setFont(FONT10);
-}
-
-void drawWaitForPlayingMenu(int trackNo, byte fps) {
-  u8g2->clearBuffer();
-  drawPlayingMenuConstants(trackNo, fps);
-  ui.drawCenteredStr(28, "Waiting for");
-  ui.drawCenteredStr(46, "Film to Start");
-  u8g2->drawXBMP(60, 54, pause_xbm_width, pause_xbm_height, pause_xbm_bits);
-  u8g2->sendBuffer();
-}
-
-void drawPlayingMenu(int trackNo, byte fps) {
-  u8g2->clearBuffer();
-  drawPlayingMenuConstants(trackNo, fps);
-  unsigned long currentmillis = millis();
-  u8g2->setFont(u8g2_font_inb24_mn);
-  u8g2->drawStr(20,36,":");
-  u8g2->drawStr(71,36,":");
-  u8g2->setCursor(4,40);
-  u8g2->print(myHours);
-  u8g2->setCursor(35,40);
-  if (myMinutes < 10) u8g2->print("0");
-  u8g2->print(myMinutes);
-  u8g2->setCursor(85,40);
-  if (mySeconds < 10) u8g2->print("0");
-  u8g2->print(mySeconds);
-
-  if (projectorPaused == 1) {
-    u8g2->drawXBMP(60, 54, pause_xbm_width, pause_xbm_height, pause_xbm_bits);
-  } else {
-    u8g2->drawXBMP(60, 54, play_xbm_width, play_xbm_height, play_xbm_bits);
-  }
-
-  if (oosyncFrames == 0) {
-    u8g2->drawXBMP(2, 54, sync_xbm_width, sync_xbm_height, sync_xbm_bits);
-  } else {
-    if (currentmillis % 700 > 350) {
-      u8g2->drawXBMP(2, 54, sync_xbm_width, sync_xbm_height, sync_xbm_bits);
-    }
-    u8g2->setFont(FONT08);
-    u8g2->setCursor(24,62);
-    if (oosyncFrames > 0) u8g2->print("+");
-    u8g2->print(oosyncFrames);
-  }
-  u8g2->sendBuffer();
 }
 
 void dimDisplay(bool activity) {

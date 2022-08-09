@@ -11,18 +11,10 @@ void UI::reverseEncoder(bool doInverse) {
   encDir_ = (doInverse) ? -1 : 1;
 }
 
-void UI::insertPaddedInt(char* target, uint16_t number, uint8_t width) {
+void UI::insertPaddedInt(char* target, uint16_t number, uint8_t base, uint8_t width) {
   char buffer[width+1];
-  itoa(number, buffer, 10);
+  itoa(number, buffer, base);
   memcpy(&target[width-strlen(buffer)], &buffer, strlen(buffer));
-}
-
-void UI::zeroPad(char* target, uint16_t number, uint8_t width, uint8_t position) {
-  char buffer1[width+1] = {'0'};
-  char buffer2[width+1];
-  itoa(number, buffer2, 10);
-  memcpy(&target[position], &buffer1, strlen(buffer1));
-  memcpy(&target[position+width-strlen(buffer2)], &buffer2, strlen(buffer2));
 }
 
 void UI::waitForBttnRelease() {
@@ -53,7 +45,10 @@ bool UI::showError(const char* errorMsg1) {
 }
 
 bool UI::showError(const char* errorMsg1, const char* errorMsg2) {
-  PRINTF("ERROR: %s %s\n", errorMsg1, errorMsg2);
+  PRINT("ERROR: ");
+  PRINT(errorMsg1);
+  PRINT(" ");
+  PRINTLN(errorMsg2);
   buzzer.playError();
   userInterfaceMessage("ERROR", errorMsg1, errorMsg2, " Okay ");
   return false;

@@ -4,7 +4,7 @@
 
 class Audio : public Adafruit_VS1053_FilePlayer {
   public:
-    Audio(int8_t rst, int8_t cs, int8_t dcs, int8_t dreq, int8_t cardCS, uint8_t SDCD);
+    Audio(void);
     uint8_t begin();
     bool selectTrack();
     bool loadPatch();
@@ -29,9 +29,12 @@ class Audio : public Adafruit_VS1053_FilePlayer {
     char _filename[11] = {0};
     uint8_t _fps = 0;
     uint16_t _trackNum = 0;
-    const uint8_t _SDCD;
-    const uint8_t _SDCS;
+    int32_t _frameOffset = 0;
     uint16_t selectTrackScreen();
+    void drawPlayingMenuConstants();
+    void drawWaitForPlayingMenu();
+    void drawPlayingMenu();
+    void drawPlayingMenuStatus(bool);
     bool loadTrack();
     uint16_t getSamplingRate();
     uint16_t getBitrate();

@@ -1,10 +1,6 @@
 #pragma once
 
 #include <EEPROM.h>
-#include <U8g2lib.h>
-#include <EncoderTool.h>
-using namespace EncoderTool;
-#include "buzzer.h"
 #include "ui.h"
 #include "serialdebug.h"
 
@@ -21,18 +17,6 @@ using namespace EncoderTool;
 #endif
 #define MAX_PROJECTOR_COUNT        ((EEPROM_SIZE - EEPROM_HEADER_BYTES) / EEPROM_BYTES_PER_PROJECTOR)
 #define EEPROM_BYTES_REQUIRED      (EEPROM_BYTES_PER_PROJECTOR * MAX_PROJECTOR_COUNT + EEPROM_HEADER_BYTES)
-
-#define FONT10 u8g2_font_helvR10_tr
-#define FONT08 u8g2_font_helvR08_tr
-extern Buzzer buzzer;
-extern UI ui;
-extern U8G2* u8g2;
-extern PolledEncoder enc;
-//extern int8_t encDir;
-
-#define GET_NAME                1
-#define JUST_PRESSED            2
-#define LONG_PRESSED            3
 
 struct EEPROMstruct {
   uint8_t shutterBladeCount = 2;

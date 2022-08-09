@@ -14,6 +14,14 @@ using namespace TeensyTimerTool;
   INCBIN(Patch, "patches.053");
 #endif
 
+// macros for time conversion
+#define SECS_PER_MIN            (60UL)
+#define SECS_PER_HOUR           (3600UL)
+#define SECS_PER_DAY            (SECS_PER_HOUR * 24L)
+#define numberOfSeconds(_time_) ( _time_ % SECS_PER_MIN)
+#define numberOfMinutes(_time_) ((_time_ / SECS_PER_MIN) % SECS_PER_MIN )
+#define numberOfHours(_time_)   ((_time_ % SECS_PER_DAY) / SECS_PER_HOUR)
+
 // some synonyms for backward compatibility
 #define SCI_MODE            VS1053_REG_MODE
 #define SCI_STATUS          VS1053_REG_STATUS
@@ -65,16 +73,13 @@ int deltaToFramesDivider;
 unsigned int impToAudioSecondsDivider;
 
 // Constructor
-Audio::Audio(int8_t rst, int8_t cs, int8_t dcs, int8_t dreq, int8_t cardCS, uint8_t SDCD)
-    : Adafruit_VS1053_FilePlayer{ rst, cs, dcs, dreq, cardCS }
-    , _SDCD { SDCD }, _SDCS { (uint8_t) cardCS } {
-
-  pinMode(_SDCD, INPUT_PULLUP);
+Audio::Audio() : Adafruit_VS1053_FilePlayer{VS1053_RST, VS1053_CS, VS1053_DCS, VS1053_DREQ, VS1053_SDCS} {
+  pinMode(VS1053_SDCD, INPUT_PULLUP);
 }
 
 uint8_t Audio::begin() {
   PRINTLN("Initializing SD card ...");
-  if (!SD.begin(_SDCS))                           // initialize SD library and card
+  if (!SD.begin(VS1053_SDCS))                     // initialize SD library and card
     return 1;
 
   PRINTLN("Initializing VS1053B ...");
@@ -93,33 +98,22 @@ uint8_t Audio::begin() {
     NVIC_SET_PRIORITY(IRQ_PORTCD, 192);
     // This could be a problem. Interrupt priorities for ports C and D cannot be
     // changed independently from one another as they share an IRQ number. Thus,
-    // we currently can't prioritize IMPULSE over DREQ:
+    // we currently can't prioritize IMPULSE over DREQ on Teensy LC:
     //
-    //    Pin 10 = DREQ      -> Port C4 / IRQ 31
     //    Pin 02 = IMPULSE   -> Port D0 / IRQ 31
-    //
-    // Possible solution 1: swap IMPULSE and STARTMARK?
-    //
     //    Pin 03 = STARTMARK -> Port A1 / IRQ 30
-    //    Should also be OK for Teensy 3.2 - see below
+    //    Pin 10 = DREQ      -> Port C4 / IRQ 31
     //
-    // Possible solution 2: use timer instead of DREQ?
-    //
-    //    Meh.
-    //
-    // Possible solution 3: noInterrupts() / interrupts()?
-    //
-    //    Check.
-    //
-    // Possible solution 4: use sei() in
+    // Possible solution: swap IMPULSE and STARTMARK?
+    // Should also be OK for Teensy 3.2 - see below.
     //
     // For reference, see schematics at https://www.pjrc.com/teensy/schematic.html
 
   #elif defined(__MK20DX256__)                    // Teensy 3.2 [MK20DX256]
     NVIC_SET_PRIORITY(IRQ_PORTC, 144);
-    //    Pin 10 = DREQ      -> Port C4  / IRQ 89
     //    Pin 02 = IMPULSE   -> Port D0  / IRQ 90
     //    Pin 03 = STARTMARK -> Port A12 / IRQ 87
+    //    Pin 10 = DREQ      -> Port C4  / IRQ 89
 
   #elif defined(ARDUINO_TEENSY40)                 // Teensy 4.0 [IMXRT1052]
     // Might not work either.
@@ -130,7 +124,7 @@ uint8_t Audio::begin() {
 }
 
 bool Audio::SDinserted() {
-  return digitalReadFast(_SDCD);
+  return digitalReadFast(VS1053_SDCD);
 }
 
 void Audio::leaderISR() {
@@ -178,13 +172,17 @@ bool Audio::selectTrack() {
 
   // 3. Cue file and activate resampler
   ui.drawBusyBee(90, 10);
-  PRINTF("Loading \"%s\"\n", _filename);
+  PRINT("Loading \"");
+  PRINT(_filename);
+  PRINTLN("\"");
   setVolume(254,254);                             // mute
   startPlayingFile(_filename);                    // start playback
   while (getSamplingRate()==8000) {}              // wait for correct data
   _fsPhysical = getSamplingRate();                // get physical sampling rate
   pausePlaying(true);                             // and pause again
-  PRINTF("Sampling rate: %d Hz\n",_fsPhysical);
+  PRINT("Sampling rate: ");
+  PRINT(_fsPhysical);
+  PRINTLN(" Hz");
   enableResampler();
   delay(500);                                     // wait for pause
   setVolume(4,4);                                 // raise volume back up for playback
@@ -221,9 +219,10 @@ bool Audio::selectTrack() {
 
     switch (state) {
     case CHECK_FOR_LEADER:
-      if (digitalReadFast(STARTMARK))
+      if (digitalReadFast(STARTMARK)) {
         state = WAIT_FOR_STARTMARK;
-      else
+        drawWaitForPlayingMenu();
+      } else
         state = OFFER_MANUAL_START;
       break;
 
@@ -257,6 +256,7 @@ bool Audio::selectTrack() {
         speedControlPID();
         runPID = false;
       }
+      drawPlayingMenu();
       break;
 
     case SHUTDOWN:
@@ -284,6 +284,138 @@ bool Audio::selectTrack() {
   return true;
 }
 
+void Audio::drawPlayingMenuConstants() {
+  u8g2->setFont(FONT08);
+  u8g2->drawStr(0, 8, projector.config().name);
+  char buffer[9] = "Film 000";
+  ui.insertPaddedInt(&buffer[5], _trackNum, 10, 3);
+  ui.drawRightAlignedStr(8, buffer);
+  itoa(_fps, buffer, 10);
+  strcat(buffer, " fps");
+  ui.drawRightAlignedStr(62, buffer);
+  u8g2->setFont(FONT10);
+}
+
+void Audio::drawPlayingMenuStatus(bool isPlaying) {
+  if (isPlaying)
+    u8g2->drawXBMP(60, 54, play_xbm_width, play_xbm_height, play_xbm_bits);
+  else
+    u8g2->drawXBMP(60, 54, pause_xbm_width, pause_xbm_height, pause_xbm_bits);
+}
+
+void Audio::drawWaitForPlayingMenu() {
+  u8g2->clearBuffer();
+  drawPlayingMenuConstants();
+  ui.drawCenteredStr(28, "Waiting for");
+  ui.drawCenteredStr(46, "Film to Start");
+  drawPlayingMenuStatus(false);
+  u8g2->sendBuffer();
+}
+
+void Audio::drawPlayingMenu() {
+  // limit display refresh-rate to 25 Hz
+  uint32_t currentMillis = millis();
+  static uint32_t prevMillis = -1;
+  if ((currentMillis-prevMillis) < 40)
+    return;
+  prevMillis = currentMillis;
+
+  // clear screen buffer & draw constants
+  u8g2->clearBuffer();
+  drawPlayingMenuConstants();
+
+  // draw time-code
+  uint32_t audioSecs = (totalImpCounter + syncOffsetImps) / impToAudioSecondsDivider;
+  uint8_t hh = numberOfHours(audioSecs);
+  uint8_t mm = numberOfMinutes(audioSecs);
+  uint8_t ss = numberOfSeconds(audioSecs);
+  u8g2->setFont(u8g2_font_inb24_mn);
+  u8g2->drawStr(20,36,":");
+  u8g2->drawStr(71,36,":");
+  u8g2->setCursor(4,40);
+  u8g2->print(hh);
+  u8g2->setCursor(35,40);
+  if (mm < 10) u8g2->print("0");
+  u8g2->print(mm);
+  u8g2->setCursor(85,40);
+  if (ss < 10) u8g2->print("0");
+  u8g2->print(ss);
+
+  // drawPlayingMenuStatus(!projectorPaused);
+
+  // draw sync status
+  if (_frameOffset == 0)
+    u8g2->drawXBMP(2, 54, sync_xbm_width, sync_xbm_height, sync_xbm_bits);
+  else {
+    if (currentMillis % 700 > 350)
+      u8g2->drawXBMP(2, 54, sync_xbm_width, sync_xbm_height, sync_xbm_bits);
+    u8g2->setFont(FONT08);
+    u8g2->setCursor(24,62);
+    if (_frameOffset > 0)
+      u8g2->print("+");
+    u8g2->print(_frameOffset);
+  }
+  u8g2->sendBuffer();
+}
+
+
+void handleFrameCorrectionOffsetInput() {
+  // int16_t parentMenuEncPosition;
+  // parentMenuEncPosition = myEnc.read();
+  // int16_t newEncPosition;
+  // int16_t oldPosition;
+
+  // myEnc.write(16000 + (newSyncOffset << 1));  // this becomes 0 further down after shifting and modulo
+  // while (digitalRead(ENCODER_BTN) == 1) {     // adjust ### as long as button not pressed
+  //   newEncPosition = myEnc.read();
+  //   if (encType == 30) {
+  //     newSyncOffset = ((newEncPosition >> 1) - 8000);
+  //   } else {
+  //     newSyncOffset = ((newEncPosition >> 2) - 4000);
+  //   }
+  //   if (newEncPosition != oldPosition) {
+  //     oldPosition = newEncPosition;
+  //     Serial.println(newSyncOffset);
+  //     u8g2.firstPage();
+  //     do {
+
+  //       // Draw Header & Footer
+  //       u8g2.setFont(u8g2_font_helvR10_tr);
+  //       if (newSyncOffset == 0) {
+  //         u8g2.drawStr(6,12,"Adjust Sync Offset");
+  //       } else if (newSyncOffset < 0) {
+  //         u8g2.drawStr(11,12,"Delay Sound by");
+  //       } else if (newSyncOffset > 0) {
+  //         u8g2.drawStr(6,12,"Advance Sound by");
+  //       }
+  //       u8g2.drawStr(40,64,"Frames");
+
+  //       u8g2.setFont(u8g2_font_inb24_mn);
+  //       if (newSyncOffset >= 0 && newSyncOffset <= 9) {
+  //         u8g2.setCursor(55, 46);
+  //       } else if (newSyncOffset >= -9 && newSyncOffset <= -1) {
+  //         u8g2.setCursor(45, 46);
+  //       } else if (newSyncOffset >= 10 && newSyncOffset <= 99) {
+  //         u8g2.setCursor(45, 46);
+  //       } else if (newSyncOffset >= -99 && newSyncOffset <= -10) {
+  //         u8g2.setCursor(35, 46);
+  //       } else if (newSyncOffset >= 100 && newSyncOffset <= 999) {
+  //         u8g2.setCursor(35, 46);
+  //       } else if (newSyncOffset >= -999 && newSyncOffset <= -100) {
+  //         u8g2.setCursor(25, 46);
+  //       }
+
+  //       u8g2.print(newSyncOffset);
+  //     } while ( u8g2.nextPage() );
+  //   }
+  // }
+
+  // ui.waitForBttnRelease();
+  // oldPosition = 0;
+  // myEnc.write(parentMenuEncPosition);
+  // u8g2.setFont(u8g2_font_helvR10_tr);   // Only until we go to the PLAYING_MENU here
+}
+
 void Audio::speedControlPID() {
   // static unsigned long lastMillis = millis();
   // if (millis() - lastMillis < 10)
@@ -298,6 +430,7 @@ void Audio::speedControlPID() {
       previousActualSampleCount = actualSampleCount;
       if (actualSampleCount < previousActualSampleCount)
         actualSampleCount = previousActualSampleCount;
+
       long desiredSampleCount = (totalImpCounter + syncOffsetImps) * impToSamplerateFactor;
       long delta = (actualSampleCount - desiredSampleCount);
 
@@ -307,8 +440,8 @@ void Audio::speedControlPID() {
 
       // prevTotalImpCounter = totalImpCounter + syncOffsetImps;
 
-      int frameOffset = (long) Input / deltaToFramesDivider;
-      //PRINTF("Delta:%d,Average:%f,FrameOffset: %d\n", delta, Input, frameOffset);
+      _frameOffset = (long) Input / deltaToFramesDivider;
+      //PRINTF("Delta:%d,Average:%f,FrameOffset: %d\n", delta, Input, _frameOffset);
       //PRINTF("Input:%0.3f,Output:%0.3f\n", Input, Output);
       //PRINTF("P:%0.5f,I:%0.5f,D:%0.5f\n",myPID.GetPterm(),myPID.GetIterm(),myPID.GetDterm());
 
@@ -339,13 +472,13 @@ uint16_t Audio::getSamplingRate() {
 
 bool Audio::loadTrack() {
   strcpy(_filename,"000-00.ogg");
-  ui.insertPaddedInt(&_filename[0],_trackNum,3);
-  for (_fps=12; _fps<=25; _fps++) {               // guess fps
-    ui.insertPaddedInt(&_filename[4], _fps, 2);
-    if (SD.exists(_filename))                     // file found!
+  ui.insertPaddedInt(&_filename[0], _trackNum, 10, 3);
+  for (_fps=12; _fps<=25; _fps++) {                     // guess fps
+    ui.insertPaddedInt(&_filename[4], _fps, 10, 2);
+    if (SD.exists(_filename))                           // file found!
       return true;
   }
-  return false;                                   // file not found
+  return false;                                         // file not found
 }
 
 uint16_t Audio::selectTrackScreen() {
@@ -398,7 +531,7 @@ bool Audio::loadPatch() {
     File file = SD.open("/patches.053", O_READ);
     uint16_t addr, n, val, i = 0;
     bool status = false;
-    PRINTF("Applying \"patches.053\" (%d bytes) from SD card ... ", file.size());
+    PRINT("Applying \"patches.053\" from SD card ... ");
     while (file.read(&addr, 2) && file.read(&n, 2)) {
       i += 2;
       if (n & 0x8000U) {
@@ -428,9 +561,9 @@ bool Audio::loadPatch() {
 
   // ... if not, we'll load it from flash memory
   #ifdef INC_PATCHES
-    PRINTF("Applying \"patches.053\" (%d bytes) from flash ... ", gPatchSize);
+    PRINT("Applying \"patches.053\" from flash ... ");
     applyPatch(reinterpret_cast<const uint16_t *>(gPatchData), gPatchSize / 2);
-    PRINTF("done\n\n");
+    PRINTLN("done");
     return true;
   #endif
   return false;
@@ -500,27 +633,23 @@ const char Audio::getRevision() {
 
 uint16_t Audio::readWRAM(uint16_t addressbyte) {
   // adapted from https://github.com/mpflaga/Arduino_Library-vs1053_for_SdFat
+  // not quite sure what to make of this ...
+  unsigned short int tmp1, tmp2;
 
-   unsigned short int tmp1,tmp2;
+  sciWrite(VS1053_REG_WRAMADDR, addressbyte);
+  tmp1 = sciRead(SCI_WRAM);
 
-   //Set SPI bus for write
-   //spiInit();
-   //SPI.setClockDivider(spi_Read_Rate);
+  sciWrite(VS1053_REG_WRAMADDR, addressbyte);
+  tmp2 = sciRead(SCI_WRAM);
 
-   sciWrite(VS1053_REG_WRAMADDR, addressbyte);
-   tmp1 = sciRead(SCI_WRAM);
+  if(tmp1==tmp2) return tmp1;
+  sciWrite(VS1053_REG_WRAMADDR, addressbyte);
+  tmp2 = sciRead(SCI_WRAM);
 
-   sciWrite(VS1053_REG_WRAMADDR, addressbyte);
-   tmp2 = sciRead(SCI_WRAM);
+  if(tmp1==tmp2) return tmp1;
+  sciWrite(VS1053_REG_WRAMADDR, addressbyte);
+  tmp2 = sciRead(SCI_WRAM);
 
-   if(tmp1==tmp2) return tmp1;
-   sciWrite(VS1053_REG_WRAMADDR, addressbyte);
-   tmp2 = sciRead(SCI_WRAM);
-
-   if(tmp1==tmp2) return tmp1;
-   sciWrite(VS1053_REG_WRAMADDR, addressbyte);
-   tmp2 = sciRead(SCI_WRAM);
-
-   if(tmp1==tmp2) return tmp1;
-   return tmp1;
+  if(tmp1==tmp2) return tmp1;
+  return tmp1;
  }

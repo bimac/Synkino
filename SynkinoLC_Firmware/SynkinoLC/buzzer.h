@@ -105,3 +105,5 @@ public:
 private:
   const uint8_t _pin;
 };
+
+extern Buzzer buzzer;
