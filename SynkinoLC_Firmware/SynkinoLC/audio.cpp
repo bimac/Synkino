@@ -235,13 +235,14 @@ bool Audio::selectTrack() {
       break;
 
     case START:
-      if (totalImpCounter < pConf.startmarkOffset)
+      if ((totalImpCounter/pConf.shutterBladeCount) < pConf.startmarkOffset)
         continue;
       totalImpCounter = 0;
       pausePlaying(false);
       PRINTLN("Started Playback.");
       sampleCountBaseLine = getSampleCount();
       pidTimer.begin([]() { runPID = true; }, 10_Hz);
+      buzzer.play(1000,42);
       state = PLAYING;
       break;
 
