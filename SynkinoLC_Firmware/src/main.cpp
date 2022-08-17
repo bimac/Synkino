@@ -4,8 +4,6 @@ char boardRevision[20] = "Hardware Revision X";   // will be corrected during in
   const char *uC = "Teensy LC";
 #elif defined(__MK20DX256__)
   const char *uC = "Teensy 3.1 / 3.2";
-#elif defined(ARDUINO_TEENSY40)
-  const char *uC = "Teensy 4.0";
 #endif
 
 #include <Arduino.h>
