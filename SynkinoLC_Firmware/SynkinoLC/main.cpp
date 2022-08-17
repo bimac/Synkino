@@ -23,6 +23,12 @@ using namespace EncoderTool;
 #include "pins.h"         // pin definitions
 #include "menus.h"        // menu definitions, positions of menu items
 
+// Declaration of functions
+// See https://docs.platformio.org/en/latest/faq/ino-to-cpp.html
+void dimDisplay(bool);
+void breathe(bool);
+uint8_t u8x8_GetMenuEvent(u8x8_t);
+
 // Initialize Objects
 Audio musicPlayer;
 U8G2* u8g2;
