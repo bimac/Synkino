@@ -3,6 +3,7 @@
 
 Buzzer::Buzzer(uint8_t pin) : _pin { pin }  {
   pinMode(pin, OUTPUT);
+  melodyTimer = new OneShotTimer(TCK);
 }
 
 void Buzzer::play(unsigned int frequency) {
@@ -17,6 +18,19 @@ void Buzzer::play(unsigned int frequency, unsigned long duration, bool useDelay)
   tone(_pin, frequency, duration);
   if (useDelay)
     delay(duration);
+}
+
+void Buzzer::melody(uint8_t n, unsigned int *frequency, unsigned long *duration) {
+  melody(n, 0, frequency, duration);
+}
+
+void Buzzer::melody(uint8_t n, uint8_t i, unsigned int *frequency, unsigned long *duration) {
+  tone(_pin, frequency[i], duration[i]);
+  i++;
+  if (i < n) {
+    melodyTimer->begin([=] { melody(n, i, frequency, duration); });
+    melodyTimer->trigger(duration[i-1] * 1000);
+  }
 }
 
 void Buzzer::playClick() {
@@ -39,8 +53,9 @@ void Buzzer::playHello() {
 }
 
 void Buzzer::playError() {
-  play(NOTE_G2, 250, true);
-  play(NOTE_C2, 500, true);
+  static unsigned int freq[] = {NOTE_G2, NOTE_C2};
+  static unsigned long dur[] = {250,     500};
+  melody(2, freq, dur);
 }
 
 void Buzzer::quiet() {

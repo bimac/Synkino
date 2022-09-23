@@ -1,4 +1,6 @@
 #pragma once
+#include "TeensyTimerTool.h"      // hard- and software timers on teensy boards
+using namespace TeensyTimerTool;
 
 #define NOTE_B0  31
 #define NOTE_C1  33
@@ -96,6 +98,8 @@ public:
   void play(unsigned int frequency);
   void play(unsigned int frequency, unsigned long duration);
   void play(unsigned int frequency, unsigned long duration, bool delay);
+  void melody(uint8_t n, unsigned int *frequency, unsigned long *duration);
+  void melody(uint8_t n, uint8_t i, unsigned int *frequency, unsigned long *duration);
   void playClick();
   void playPress();
   void playConfirm();
@@ -104,6 +108,7 @@ public:
   void quiet();
 private:
   const uint8_t _pin;
+  OneShotTimer* melodyTimer;
 };
 
 extern Buzzer buzzer;
