@@ -22,6 +22,7 @@ class Audio : public Adafruit_VS1053_FilePlayer {
     uint16_t _trackNum = 0;
     int32_t _frameOffset = 0;
 
+    uint32_t lastSampleCounterHaltPos = 0;
     int32_t  syncOffsetImps = 0;
     uint32_t sampleCountBaseLine = 0;
     uint16_t impToSamplerateFactor;
@@ -45,6 +46,9 @@ class Audio : public Adafruit_VS1053_FilePlayer {
     void drawWaitForPlayingMenu();
     void drawPlayingMenu();
     void drawPlayingMenuStatus();
+    void handleFrameCorrectionOffsetInput();
+    uint8_t drawTrackLoadedMenu();
+    uint8_t drawTrackLoadedMenu(uint8_t);
     bool loadTrack();
     uint16_t getSamplingRate();
     uint16_t getBitrate();

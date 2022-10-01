@@ -1,4 +1,4 @@
-const char *uCVersion  = "SynkinoLC v1.0 alpha";
+const char *uCVersion  = "SynkinoLC v1.0 beta";
 char boardRevision[20] = "Hardware Revision X";   // will be corrected during initialization of VS1053B
 #if defined(__MKL26Z64__)
   const char *uC = "Teensy LC";

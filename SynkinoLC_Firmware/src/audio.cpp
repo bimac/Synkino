@@ -8,6 +8,10 @@
 using namespace TeensyTimerTool;
 #include <QuickPID.h>
 
+#include <EncoderTool.h>
+using namespace EncoderTool;
+extern PolledEncoder enc;
+
 // Add patches.053 to flash?
 #ifdef INC_PATCHES
   #include <incbin.h>
@@ -51,11 +55,12 @@ using namespace TeensyTimerTool;
 #define CHECK_FOR_LEADER         0
 #define OFFER_MANUAL_START       1
 #define WAIT_FOR_STARTMARK       2
-#define START                    3
-#define PLAYING                  4
-#define PAUSE                    5
-#define PAUSED                   6
-#define RESUME                   7
+#define WAIT_FOR_OFFSET          3
+#define START                    4
+#define PLAYING                  5
+#define PAUSE                    6
+#define PAUSED                   7
+#define RESUME                   8
 #define SHUTDOWN               254
 #define QUIT                   255
 
@@ -143,6 +148,7 @@ void Audio::countISR() {
 bool Audio::selectTrack() {
   EEPROMstruct pConf = projector.config();        // get projector configuration
   uint8_t state = CHECK_FOR_LEADER;
+  bool showOffsetCorrectionInput = false;
 
   // 1. Indicate presence of film leader using LED
   leaderISR();
@@ -156,15 +162,8 @@ bool Audio::selectTrack() {
     return ui.showError("File not found.");                   // back to track selection
   if (!connected())                                           // check if audio is plugged in
     return ui.showError("Please connect audio device.");
-  if (!digitalReadFast(STARTMARK)) {                          // check for leader
-    if (ui.userInterfaceMessage("Can't detect film leader.",
-                                "Use manual start?", "",
-                                " Cancel \n Yes ") == 2) {
-      state = OFFER_MANUAL_START;
-      detachInterrupt(STARTMARK);
-    } else
-      return true;                                            // back to main-menu
-  }
+  if (!digitalReadFast(STARTMARK))                            // check for leader
+    state = OFFER_MANUAL_START;
 
   // 3. Cue file
   ui.drawBusyBee(90, 10);
@@ -183,11 +182,20 @@ bool Audio::selectTrack() {
   delay(500);                         // wait for pause
   setVolume(4,4);                     // raise volume back up for playback
 
+  // 4. Define some conversion factors
   impToSamplerateFactor    = _fsPhysical / _fps / pConf.shutterBladeCount;
   deltaToFramesDivider     = _fsPhysical / _fps;
   impToAudioSecondsDivider = _fps * pConf.shutterBladeCount;
 
-  // 4. Prepare PID
+  // 5. Reset variables
+  lastSampleCounterHaltPos = 0;
+  syncOffsetImps           = 0;
+  Setpoint                 = 0;
+  Input                    = 0;
+  Output                   = 0;
+  while (average(0) != 0) {}
+
+  // 6. Prepare PID
   myPID.SetMode(myPID.Control::timer);
   myPID.SetProportionalMode(myPID.pMode::pOnMeas);
   myPID.SetDerivativeMode(myPID.dMode::dOnMeas);
@@ -201,7 +209,7 @@ bool Audio::selectTrack() {
     default:    myPID.SetOutputLimits(-400000,  77000);         // lets assume 44.2 kHz here
   }
 
-  // 5. Run state machine
+  // 7. Run state machine
   while (state != QUIT) {
     yield();
 
@@ -216,8 +224,14 @@ bool Audio::selectTrack() {
       break;
 
     case OFFER_MANUAL_START:
-      // TO IMPLEMENT
-      state = QUIT;
+      if (ui.userInterfaceMessage("Can't detect film leader.",
+                                  "Trigger manual start?", "",
+                                  " Cancel \n OK ") == 2) {
+        state = START;
+        detachInterrupt(STARTMARK);
+        attachInterrupt(IMPULSE, countISR, RISING); // start impulse counter
+      } else
+        state = SHUTDOWN; // back to main-menu
       break;
 
     case WAIT_FOR_STARTMARK:
@@ -227,22 +241,28 @@ bool Audio::selectTrack() {
       PRINT("Waiting for ");
       PRINT(pConf.startmarkOffset);
       PRINTLN(" frames ...");
-      totalImpCounter = 0;
       detachInterrupt(STARTMARK);
       digitalWriteFast(LED_BUILTIN, LOW);
+      totalImpCounter = 0;
       attachInterrupt(IMPULSE, countISR, RISING); // start impulse counter
+      state = WAIT_FOR_OFFSET;
+      break;
+
+    case WAIT_FOR_OFFSET:
+      if ((totalImpCounter/pConf.shutterBladeCount) < pConf.startmarkOffset)
+        continue;
       state = START;
       break;
 
     case START:
-      if ((totalImpCounter/pConf.shutterBladeCount) < pConf.startmarkOffset)
-        continue;
       totalImpCounter = 0;
       pausePlaying(false);
-      PRINTLN("Started Playback.");
+      PRINTLN("Starting playback.");
       sampleCountBaseLine = getSampleCount();
       pidTimer.begin([]() { runPID = true; }, 10_Hz);
-      buzzer.play(1000,42);
+      buzzer.play(1000,42); // play 2-pop ;-)
+      enc.setValue(0);
+      enc.buttonChanged();
       state = PLAYING;
       break;
 
@@ -252,14 +272,33 @@ bool Audio::selectTrack() {
         runPID = false;
         state  = handlePause();
       }
-      drawPlayingMenu();
+
+      if (enc.buttonChanged() && enc.getButton()) {
+        showOffsetCorrectionInput = !showOffsetCorrectionInput;
+        if (showOffsetCorrectionInput)
+          enc.setValue(syncOffsetImps / pConf.shutterBladeCount);
+        else {
+          PRINT("Sync-offset set to ");
+          PRINT(syncOffsetImps / pConf.shutterBladeCount);
+          PRINTLN(" frames.");
+        }
+      }
+
+      if (showOffsetCorrectionInput)
+        handleFrameCorrectionOffsetInput();
+      else
+        drawPlayingMenu();
+
       if (stopped())
         state = SHUTDOWN;
       break;
 
     case PAUSE:
+      lastSampleCounterHaltPos = getSampleCount();
       pausePlaying(true);
-      PRINTLN("Paused Playback.");
+      PRINT("Pausing playback at sample ");
+      PRINTLN(lastSampleCounterHaltPos);
+      myPID.SetMode(myPID.Control::manual);
       pidTimer.stop();
       state = PAUSED;
       break;
@@ -270,15 +309,19 @@ bool Audio::selectTrack() {
       break;
 
     case RESUME:
-      pausePlaying(false);
-      PRINTLN("Resumed Playback.");
+      myPID.SetMode(myPID.Control::timer);
       pidTimer.start();
+      restoreSampleCounter(lastSampleCounterHaltPos);
+      pausePlaying(false);
+      PRINTLN("Resuming playback.");
       state = PLAYING;
       break;
 
     case SHUTDOWN:
       stopPlaying();
-      PRINTLN("Stopped Playback.");
+      myPID.SetMode(myPID.Control::manual);
+      pidTimer.stop();
+      PRINTLN("Stopped playback.");
       detachInterrupt(IMPULSE);
       state = QUIT;
     }
@@ -304,27 +347,11 @@ uint8_t Audio::handlePause() {
       prevTotalImpCounter = totalImpCounter + syncOffsetImps;
       lastImpMillis = millis();
     } else if ((millis() - lastImpMillis) >= pauseDetectedPeriod) {
-      //lastSampleCounterHaltPos = Read32BitsFromSCI(0x1800);
-      //myPID.SetMode(MANUAL);
-      //lastImpCounterHaltPos = totalImpCounter + syncOffsetImps;
       return PAUSE;
     }
     return PLAYING;
   }
 }
-
-// uint8_t Audio::waitForResumeToPlay(unsigned long impCounterStopPos) {
-//   static uint32_t prevTotalImpCounter = 0;
-//   if ((totalImpCounter + syncOffsetImps) == impCounterStopPos) {
-//     return;
-//   } else {
-//     myPID.SetMode(AUTOMATIC);
-//     restoreSampleCounter(lastSampleCounterHaltPos);
-//     musicPlayer.resumeMusic();
-//     tellFrontend(CMD_PROJ_PLAY, 0);
-//     myState = PLAYING;
-//   }
-// }
 
 void Audio::speedControlPID() {
   uint32_t actualSampleCount = getSampleCount() - sampleCountBaseLine;
@@ -341,10 +368,6 @@ void Audio::speedControlPID() {
   //PRINTF("Delta:%d,Average:%f,FrameOffset: %d\n", delta, Input, _frameOffset);
   //PRINTF("Input:%0.3f,Output:%0.3f\n", Input, Output);
   //PRINTF("P:%0.5f,I:%0.5f,D:%0.5f\n", myPID.GetPterm(), myPID.GetIterm(), myPID.GetDterm());
-
-// if (musicPlayer.isPlaying() == 0) // and/or musicPlayer.getState() == 4
-//   resetAudio();
-
 }
 
 void Audio::drawPlayingMenuConstants() {
@@ -422,61 +445,60 @@ void Audio::drawPlayingMenu() {
 }
 
 
-void handleFrameCorrectionOffsetInput() {
-  // int16_t parentMenuEncPosition;
-  // parentMenuEncPosition = myEnc.read();
-  // int16_t newEncPosition;
-  // int16_t oldPosition;
+uint8_t Audio::drawTrackLoadedMenu(uint8_t preselect) {
+  const char *trackLoaded_menu =
+    "Manual Start\n"
+    "Stop\n"
+    "Exit";
+  uint8_t selection = u8g2->userInterfaceSelectionList("Playback", preselect, trackLoaded_menu);
+  return selection;
+}
 
-  // myEnc.write(16000 + (newSyncOffset << 1));  // this becomes 0 further down after shifting and modulo
-  // while (digitalRead(ENCODER_BTN) == 1) {     // adjust ### as long as button not pressed
-  //   newEncPosition = myEnc.read();
-  //   if (encType == 30) {
-  //     newSyncOffset = ((newEncPosition >> 1) - 8000);
-  //   } else {
-  //     newSyncOffset = ((newEncPosition >> 2) - 4000);
-  //   }
-  //   if (newEncPosition != oldPosition) {
-  //     oldPosition = newEncPosition;
-  //     Serial.println(newSyncOffset);
-  //     u8g2.firstPage();
-  //     do {
 
-  //       // Draw Header & Footer
-  //       u8g2.setFont(u8g2_font_helvR10_tr);
-  //       if (newSyncOffset == 0) {
-  //         u8g2.drawStr(6,12,"Adjust Sync Offset");
-  //       } else if (newSyncOffset < 0) {
-  //         u8g2.drawStr(11,12,"Delay Sound by");
-  //       } else if (newSyncOffset > 0) {
-  //         u8g2.drawStr(6,12,"Advance Sound by");
-  //       }
-  //       u8g2.drawStr(40,64,"Frames");
+void Audio::handleFrameCorrectionOffsetInput() {
+  // limit display refresh-rate to 25 Hz
+  uint32_t currentMillis = millis();
+  static uint32_t prevMillis = -1;
+  if ((currentMillis-prevMillis) < 40)
+    return;
+  prevMillis = currentMillis;
 
-  //       u8g2.setFont(u8g2_font_inb24_mn);
-  //       if (newSyncOffset >= 0 && newSyncOffset <= 9) {
-  //         u8g2.setCursor(55, 46);
-  //       } else if (newSyncOffset >= -9 && newSyncOffset <= -1) {
-  //         u8g2.setCursor(45, 46);
-  //       } else if (newSyncOffset >= 10 && newSyncOffset <= 99) {
-  //         u8g2.setCursor(45, 46);
-  //       } else if (newSyncOffset >= -99 && newSyncOffset <= -10) {
-  //         u8g2.setCursor(35, 46);
-  //       } else if (newSyncOffset >= 100 && newSyncOffset <= 999) {
-  //         u8g2.setCursor(35, 46);
-  //       } else if (newSyncOffset >= -999 && newSyncOffset <= -100) {
-  //         u8g2.setCursor(25, 46);
-  //       }
+  EEPROMstruct pConf = projector.config();
+  int32_t newSyncOffset = enc.getValue();
+  syncOffsetImps = newSyncOffset * pConf.shutterBladeCount;
 
-  //       u8g2.print(newSyncOffset);
-  //     } while ( u8g2.nextPage() );
-  //   }
-  // }
+  // clear screen buffer
+  u8g2->clearBuffer();
 
-  // ui.waitForBttnRelease();
-  // oldPosition = 0;
-  // myEnc.write(parentMenuEncPosition);
-  // u8g2.setFont(u8g2_font_helvR10_tr);   // Only until we go to the PLAYING_MENU here
+  // Draw Header & Footer
+  u8g2->setFont(FONT10);
+  if (newSyncOffset == 0) {
+    u8g2->drawStr(6,12,"Adjust Sync Offset");
+  } else if (newSyncOffset < 0) {
+    u8g2->drawStr(11,12,"Delay Sound by");
+  } else if (newSyncOffset > 0) {
+    u8g2->drawStr(6,12,"Advance Sound by");
+  }
+  u8g2->drawStr(40,64,"Frames");
+
+  // Draw number of offset frames
+  u8g2->setFont(u8g2_font_inb24_mn);
+  if (newSyncOffset >= 0 && newSyncOffset <= 9)
+    u8g2->setCursor(55, 46);
+  else if (newSyncOffset >= -9 && newSyncOffset <= -1)
+    u8g2->setCursor(45, 46);
+  else if (newSyncOffset >= 10 && newSyncOffset <= 99)
+    u8g2->setCursor(45, 46);
+  else if (newSyncOffset >= -99 && newSyncOffset <= -10)
+    u8g2->setCursor(35, 46);
+  else if (newSyncOffset >= 100 && newSyncOffset <= 999)
+    u8g2->setCursor(35, 46);
+  else if (newSyncOffset >= -999 && newSyncOffset <= -100)
+    u8g2->setCursor(25, 46);
+  u8g2->print(newSyncOffset);
+
+  u8g2->sendBuffer();
+  u8g2->setFont(FONT10);
 }
 
 int32_t Audio::average(int32_t input) {
