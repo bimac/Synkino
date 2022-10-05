@@ -165,8 +165,14 @@ bool Audio::selectTrack() {
   if (!digitalReadFast(STARTMARK))                            // check for leader
     state = OFFER_MANUAL_START;
 
-  // 3. Cue file
-  ui.drawBusyBee(90, 10);
+  // 3. Busy bee is working hard ...
+  u8g2->clearBuffer();
+  u8g2->setFont(FONT10);
+  u8g2->drawStr(8,50,"Loading...");
+  PeriodicTimer beeTimer(TCK);
+  beeTimer.begin([]() { ui.drawBusyBee(90, 10); }, 30_Hz);
+
+  // 4. Cue file
   PRINT("Loading \"");
   PRINT(_filename);
   PRINTLN("\"");
@@ -182,12 +188,12 @@ bool Audio::selectTrack() {
   delay(500);                         // wait for pause
   setVolume(4,4);                     // raise volume back up for playback
 
-  // 4. Define some conversion factors
+  // 5. Define some conversion factors
   impToSamplerateFactor    = _fsPhysical / _fps / pConf.shutterBladeCount;
   deltaToFramesDivider     = _fsPhysical / _fps;
   impToAudioSecondsDivider = _fps * pConf.shutterBladeCount;
 
-  // 5. Reset variables
+  // 6. Reset variables
   lastSampleCounterHaltPos = 0;
   syncOffsetImps           = 0;
   Setpoint                 = 0;
@@ -195,7 +201,7 @@ bool Audio::selectTrack() {
   Output                   = 0;
   while (average(0) != 0) {}
 
-  // 6. Prepare PID
+  // 7. Prepare PID
   myPID.SetMode(myPID.Control::timer);
   myPID.SetProportionalMode(myPID.pMode::pOnMeas);
   myPID.SetDerivativeMode(myPID.dMode::dOnMeas);
@@ -209,7 +215,8 @@ bool Audio::selectTrack() {
     default:    myPID.SetOutputLimits(-400000,  77000);         // lets assume 44.2 kHz here
   }
 
-  // 7. Run state machine
+  // 8. Run state machine
+  beeTimer.stop();
   while (state != QUIT) {
     yield();
 

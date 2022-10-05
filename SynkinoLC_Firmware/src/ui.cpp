@@ -25,10 +25,7 @@ void UI::waitForBttnRelease() {
 }
 
 void UI::drawBusyBee(u8g2_uint_t x, u8g2_uint_t y) {
-  u8g2->clearBuffer();
-  u8g2->drawXBMP(x, y, busybee_xbm_width, busybee_xbm_height, busybee_xbm_bits);
-  u8g2->setFont(FONT10);
-  u8g2->drawStr(8,50,"Loading...");
+  u8g2->drawXBMP(x+random(-1,1), y+random(-1,1), busybee_xbm_width, busybee_xbm_height, busybee_xbm_bits);
   u8g2->sendBuffer();
 }
 
