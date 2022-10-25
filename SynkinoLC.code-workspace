@@ -1,13 +1,8 @@
 {
 	"folders": [
 		{
-			"name": "Base Directory",
 			"path": "."
-		},
-		{
-			"name": "SynkinoLC Firmware",
-			"path": "SynkinoLC_Firmware"
-		},
+		}
 	],
 	"settings": {
 		"files.associations": {
