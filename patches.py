@@ -1,19 +1,14 @@
 from os.path import join, isfile
+from shutil import which
 
 Import("env")
-
-try:
-    import patch
-except ImportError:
-    env.Execute("$PYTHONEXE -m pip install patch")
-    import patch
 
 dnFramework = env.PioPlatform().get_package_dir("framework-arduinoteensy")
 dnLib       = join(dnFramework, "libraries", "SD", "src")
 fnPatchFlag = join(dnLib, ".patched")
 
 # patch file only if we didn't do it before
-if not isfile(fnPatchFlag):
+if which("patch") and not isfile(fnPatchFlag):
     fnOriginal = join(dnLib, "SD.h")
     fnPatch    = join("patches", "SD.patch")
 
