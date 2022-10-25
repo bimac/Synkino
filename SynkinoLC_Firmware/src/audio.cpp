@@ -194,6 +194,8 @@ bool Audio::selectTrack() {
   impToAudioSecondsDivider = _fps * pConf.shutterBladeCount;
 
   // 6. Reset variables
+  _frameOffset             = 0;
+  sampleCountBaseLine      = 0;
   lastSampleCounterHaltPos = 0;
   syncOffsetImps           = 0;
   Setpoint                 = 0;

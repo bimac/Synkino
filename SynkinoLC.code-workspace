@@ -36,7 +36,8 @@
 			"fstream": "cpp",
 			"algorithm": "cpp",
 			"random": "cpp",
-			"climits": "cpp"
+			"climits": "cpp",
+			"list": "cpp"
 		}
 	}
 }
