@@ -1,15 +1,9 @@
-44,49c44
-< #if defined(__arm__)
-<   // Support everything on 32 bit boards with enough memory
-<   #define SDFAT_FILE FsFile
-<   #define SDFAT_BASE SdFs
-<   #define MAX_FILENAME_LEN 256
-< #elif defined(__AVR__)
----
-> #if defined(__AVR__) || defined(SDFAT_LOWMEM)
-53a49,53
-> #elif defined(__arm__)
->   // Support everything on 32 bit boards with enough memory
->   #define SDFAT_FILE FsFile
->   #define SDFAT_BASE SdFs
->   #define MAX_FILENAME_LEN 256
+@@ -1977,197 +1977,54 @@
+ if%0A%0A
+-#if defined(__arm__)%0A  // Support everything on 32 bit boards with enough memory%0A  #define SDFAT_FILE FsFile%0A  #define SDFAT_BASE SdFs%0A  #define MAX_FILENAME_LEN 256%0A#elif defined(__AVR__)%0A
++#if defined(__AVR__) %7C%7C defined(SDFAT_LOWMEM)%0A
+   //
+@@ -2172,16 +2172,184 @@
+ _LEN 64%0A
++#elif defined(__arm__)%0A  // Support everything on 32 bit boards with enough memory%0A  #define SDFAT_FILE FsFile%0A  #define SDFAT_BASE SdFs%0A  #define MAX_FILENAME_LEN 256%0A
+ #endif%0A%0A

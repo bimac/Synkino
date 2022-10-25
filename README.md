@@ -40,7 +40,7 @@ To build SynkinoLC:
 * select the respective project environment (```env:teensyLC``` or ```enc:teensy31```), and
 * start the build
 
-The firmware won't fit TeensyLC unless you modify ```SD.h``` as outlined [here](https://github.com/PaulStoffregen/SD/pull/44/commits/c3661d2aef4534b5e9cb3a7f66da09e8c61bf286).
+The firmware won't fit TeensyLC unless ```SD.h``` is modified as outlined [here](https://github.com/PaulStoffregen/SD/pull/44/commits/c3661d2aef4534b5e9cb3a7f66da09e8c61bf286). A pre-build script will attempt to patch this file automatically.
 
 
 ## Choice of OLED display
