@@ -1,5 +1,6 @@
 # SynkinoLC
 
+<img align="right" src="pcb/SynkinoLC_RevB.png" width="400px">
 Allows sound playback synchronised to a running, jittery Super 8 projector.
 
 This is a fork of [fwachsmuth/Synkino](https://github.com/fwachsmuth/Synkino) with the following changes:
