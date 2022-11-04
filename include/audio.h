@@ -17,7 +17,8 @@ class Audio : public Adafruit_VS1053_FilePlayer {
     float Setpoint, Input, Output;
 
     uint16_t _fsPhysical = 0;
-    char _filename[11] = {0};
+    char _filename[13] = {0};
+    bool _isLoop = false;
     uint8_t _fps = 0;
     uint16_t _trackNum = 0;
     int32_t _frameOffset = 0;

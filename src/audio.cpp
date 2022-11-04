@@ -382,7 +382,8 @@ void Audio::speedControlPID() {
 void Audio::drawPlayingMenuConstants() {
   u8g2->setFont(FONT08);
   u8g2->drawStr(0, 8, projector.config().name);
-  char buffer[9] = "Film 000";
+  char buffer[9];
+  strcpy(buffer, (_isLoop) ? "Loop 000" : "Film 000");
   ui.insertPaddedInt(&buffer[5], _trackNum, 10, 3);
   ui.drawRightAlignedStr(8, buffer);
   itoa(_fps, buffer, 10);
@@ -528,12 +529,16 @@ uint16_t Audio::getSamplingRate() {
 }
 
 bool Audio::loadTrack() {
-  strcpy(_filename,"000-00.ogg");
-  ui.insertPaddedInt(&_filename[0], _trackNum, 10, 3);
-  for (_fps=12; _fps<=25; _fps++) {                     // guess fps
-    ui.insertPaddedInt(&_filename[4], _fps, 10, 2);
-    if (SD.exists(_filename))                           // file found!
-      return true;
+  for (bool isLoop : { false, true })  {
+    strcpy(_filename, (isLoop) ? "000-00-L.ogg" : "000-00.ogg");
+    ui.insertPaddedInt(&_filename[0], _trackNum, 10, 3);
+    for (_fps=12; _fps<=25; _fps++) {                             // guess fps
+      ui.insertPaddedInt(&_filename[4], _fps, 10, 2);
+      if (SD.exists(_filename)) {                                 // file found!
+        _isLoop = isLoop;
+        return true;
+      }
+    }
   }
   return false;                                         // file not found
 }
