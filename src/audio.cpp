@@ -18,6 +18,11 @@ extern PolledEncoder enc;
   INCBIN(Patch, "patches.053");
 #endif
 
+// Use MTP disk?
+#if defined USB_MTBDISK || defined USB_MTPDISK_SERIAL
+  #include <MTP_Teensy.h>
+#endif
+
 // macros for time conversion
 #define SECS_PER_MIN            (60UL)
 #define SECS_PER_HOUR           (3600UL)
@@ -221,6 +226,9 @@ bool Audio::selectTrack() {
   beeTimer.stop();
   while (state != QUIT) {
     yield();
+    #if defined USB_MTBDISK || defined USB_MTPDISK_SERIAL
+      MTP.loop();
+    #endif
 
     switch (state) {
     case CHECK_FOR_LEADER:

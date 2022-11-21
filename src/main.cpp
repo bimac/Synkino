@@ -21,6 +21,13 @@ using namespace EncoderTool;
 #include "pins.h"         // pin definitions
 #include "menus.h"        // menu definitions, positions of menu items
 
+// Use MTP disk?
+#if defined USB_MTBDISK || defined USB_MTPDISK_SERIAL
+  #include <SD.h>
+  #include <MTP_Teensy.h>
+  #define CS_SD VS1053_SDCS
+#endif
+
 // Declaration of functions
 // See https://docs.platformio.org/en/latest/faq/ino-to-cpp.html
 void dimDisplay(bool);
@@ -95,6 +102,11 @@ void setup(void) {
     case 3: ui.showError("Could not apply", "patches.053");
   }
   boardRevision[18] = musicPlayer.getRevision();
+
+  // initialize MTP filesystem
+  #if defined USB_MTBDISK || defined USB_MTPDISK_SERIAL
+    MTP.addFilesystem(SD, "SynkinoLC Storage");
+  #endif
 
   projector.loadLast();
 
@@ -222,6 +234,9 @@ void breathe(bool doBreathe) {
 // This overwrites the weak function in u8x8_debounce.c
 uint8_t u8x8_GetMenuEvent(u8x8_t *u8x8) {
     yield();
+    #if defined USB_MTBDISK || defined USB_MTPDISK_SERIAL
+      MTP.loop();
+    #endif
 
     if (enc.valueChanged()) {
       buzzer.playClick();                         // feedback sound
