@@ -3,7 +3,7 @@
 <img align="right" src="pcb/SynkinoLC_RevB.png" width="400px">
 Allows sound playback synchronised to a running, jittery Super 8 projector.
 
-This is a fork of [fwachsmuth/Synkino](https://github.com/fwachsmuth/Synkino) with the following changes:
+SynkinoLC started as a fork of [fwachsmuth/Synkino](https://github.com/fwachsmuth/Synkino) with the following changes:
 
 * While the original Synkino relies on two 8-bit ATmega328P microcontrollers (one for the frontend, one for the backend), SynkinoLC makes use of a single 32-bit ARM processor by means of a Teensy microcontroller board.
 * SynkinoLC uses only a few off-the-shelf components to make assembly as straightforward as possible. No SMD soldering is required.
