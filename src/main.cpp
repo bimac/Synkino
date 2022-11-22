@@ -26,6 +26,7 @@ using namespace EncoderTool;
   #include <SD.h>
   #include <MTP_Teensy.h>
   #define CS_SD VS1053_SDCS
+  PeriodicTimer mtpTimer(TCK);
 #endif
 
 // Declaration of functions
@@ -105,7 +106,8 @@ void setup(void) {
 
   // initialize MTP filesystem
   #if defined USB_MTBDISK || defined USB_MTPDISK_SERIAL
-    MTP.addFilesystem(SD, "SynkinoLC Storage");
+    MTP.addFilesystem(SD, "SD card");
+    mtpTimer.begin([]() { MTP.loop(); }, 50_Hz);
   #endif
 
   projector.loadLast();
@@ -234,9 +236,6 @@ void breathe(bool doBreathe) {
 // This overwrites the weak function in u8x8_debounce.c
 uint8_t u8x8_GetMenuEvent(u8x8_t *u8x8) {
     yield();
-    #if defined USB_MTBDISK || defined USB_MTPDISK_SERIAL
-      MTP.loop();
-    #endif
 
     if (enc.valueChanged()) {
       buzzer.playClick();                         // feedback sound

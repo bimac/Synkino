@@ -1,0 +1,15 @@
+@@ -1972,12 +1972,35 @@
+ UF %22
+-PJRC
++filmkorn.org / IFMA-film.de
+ %22%0A#d
+@@ -2016,22 +2016,25 @@
+ _MODEL %22
+-Teensy
++SynkinoLC
+ %22%0A#defin
+@@ -2093,22 +2093,25 @@
+ P_NAME %22
+-Teensy
++SynkinoLC
+ %22%0A%0A#defi

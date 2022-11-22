@@ -9,7 +9,7 @@ This is a fork of [fwachsmuth/Synkino](https://github.com/fwachsmuth/Synkino) wi
 * SynkinoLC uses only a few off-the-shelf components to make assembly as straightforward as possible. No SMD soldering is required.
 * The firmware has been optimized to fit the 62K flash of the affordable but powerful Teensy LC microcontroller board (with a few limitations - see below). Teensy 3.2 is also supported.
 * Unlike the original Synkino, SynkinoLC is not designed for battery operation. Use any micro-USB phone charger as a power supply unit.
-* When connected to a PC/Mac via USB you'll have direct access to SynkinoLC's SD card via MTP (Teensy 3.2 only).
+* When connected to a host via USB you'll have direct access to SynkinoLC's SD card via MTP (Teensy 3.2 only).
 
 Most parts of [Friedemann's manual for the original Synkino](https://www.filmkorn.org/synkino-instruction-manual/?lang=en) apply for SynkinoLC as well.
 
