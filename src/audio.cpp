@@ -61,12 +61,14 @@ extern PolledEncoder enc;
 #define PAUSE                    6
 #define PAUSED                   7
 #define RESUME                   8
+#define LOOP                     9
 #define SHUTDOWN               254
 #define QUIT                   255
 
 extern UI ui;
 extern Projector projector;
 
+bool looping = false;
 bool runPID = false;
 PeriodicTimer pidTimer(TCK);
 volatile uint32_t totalImpCounter = 0;
@@ -124,12 +126,18 @@ uint8_t Audio::begin() {
   return 0;                                       // return false (no error)
 }
 
+Mode Audio::detectMode(){
+
+
+}
+
 bool Audio::SDinserted() {
   return digitalReadFast(VS1053_SDCD);
 }
 
 void Audio::leaderISR() {
   digitalWriteFast(LED_BUILTIN, digitalReadFast(STARTMARK));
+
 }
 
 void Audio::countISR() {
@@ -185,6 +193,9 @@ bool Audio::selectTrack() {
   PRINT("Sampling rate: ");
   PRINT(_fsPhysical);
   PRINTLN(" Hz");
+  PRINTLN("Looping: ");
+  PRINT(looping);
+  PRINTLN("\"");
   delay(500);                         // wait for pause
   setVolume(4,4);                     // raise volume back up for playback
 
@@ -224,6 +235,7 @@ bool Audio::selectTrack() {
 
     switch (state) {
     case CHECK_FOR_LEADER:
+    PRINTLN("State = Check for leader");
       if (digitalReadFast(STARTMARK)) {
         PRINT("Waiting for start mark ... ");
         drawWaitForPlayingMenu();
@@ -246,6 +258,7 @@ bool Audio::selectTrack() {
     case WAIT_FOR_STARTMARK:
       if (digitalReadFast(STARTMARK))
         continue; // there is still leader
+      attachInterrupt(IMPULSE, countISR, RISING); // start impulse counter
       PRINTLN("Hit!");
       PRINT("Waiting for ");
       PRINT(pConf.startmarkOffset);
@@ -253,7 +266,6 @@ bool Audio::selectTrack() {
       detachInterrupt(STARTMARK);
       digitalWriteFast(LED_BUILTIN, LOW);
       totalImpCounter = 0;
-      attachInterrupt(IMPULSE, countISR, RISING); // start impulse counter
       state = WAIT_FOR_OFFSET;
       break;
 
@@ -273,9 +285,22 @@ bool Audio::selectTrack() {
       enc.setValue(0);
       enc.buttonChanged();
       state = PLAYING;
+      //runPID = true;
+      //PRINTLN("Entering Playing State");
+      _frameOffset = 0;
+      PRINTLN( "runPid = ");
+      PRINT(runPID);
+
+      PRINTLN("PID Mode = ");
+      PRINTLN(myPID.GetMode());
+
       break;
 
     case PLAYING:
+      //PRINTLN("State Playing");
+      //speedControlPID();
+
+      PRINTLN(_frameOffset);
       if (runPID) {
         speedControlPID();
         runPID = false;
@@ -300,7 +325,98 @@ bool Audio::selectTrack() {
 
       if (stopped())
         state = SHUTDOWN;
+
+      if (looping){
+        if (digitalReadFast(STARTMARK)){
+          attachInterrupt(STARTMARK, leaderISR, CHANGE);
+          state = LOOP;
+        }
+      }
       break;
+
+    case LOOP:
+
+          detachInterrupt(IMPULSE);
+          //runPID = false;
+          drawWaitForPlayingMenu();
+          myPID.SetMode(myPID.Control::manual);
+          //pidTimer.stop();
+          PRINTLN("Stopped playback.");
+
+
+          EEPROMstruct pConf = projector.config();        // get projector configuration
+          state = CHECK_FOR_LEADER;
+          bool showOffsetCorrectionInput = false;
+
+  // 1. Indicate presence of film leader using LED
+          leaderISR();
+          attachInterrupt(STARTMARK, leaderISR, CHANGE);
+             
+          PRINTLN("State Loop");
+
+
+          //Resetting audio player
+          // 5. Define some conversion factors
+          impToSamplerateFactor    = _fsPhysical / _fps / pConf.shutterBladeCount;
+          deltaToFramesDivider     = _fsPhysical / _fps;
+          impToAudioSecondsDivider = _fps * pConf.shutterBladeCount;
+
+           // 6. Reset variables
+
+          _frameOffset             = 0;
+          sampleCountBaseLine      = 0;
+          lastSampleCounterHaltPos = 0;
+          syncOffsetImps           = 0;
+          Setpoint                 = 0;
+          Input                    = 0;
+          Output                   = 0;
+
+          totalImpCounter          = 0;
+          //while (average(0) != 0) {}
+
+          
+            PRINT("Loading \"");
+            PRINT(_filename);
+            PRINTLN("\"");
+            setVolume(254,254);                 // mute
+            clearSampleCounter();
+            startPlayingFile(_filename);        // start playback
+            while (getSamplingRate()==8000) {}  // wait for correct data
+            _fsPhysical = getSamplingRate();    // get physical sampling rate
+            pausePlaying(true);                 // and pause again
+            PRINT("Sampling rate: ");
+            PRINT(_fsPhysical);
+            PRINTLN(" Hz");
+            PRINTLN("Looping: ");
+            PRINT(looping);
+            PRINTLN("\"");
+
+            delay(500);                         // wait for pause
+            setVolume(4,4);                     // raise volume back up for playback
+          //Kill PID timer
+          pidTimer.end(); 
+          // 7. Prepare PID
+          myPID.SetMode(myPID.Control::timer);
+          myPID.SetProportionalMode(myPID.pMode::pOnMeas);
+          myPID.SetDerivativeMode(myPID.dMode::dOnMeas);
+          myPID.SetAntiWindupMode(myPID.iAwMode::iAwClamp);
+          myPID.SetTunings(pConf.p, pConf.i, pConf.d);
+          switch (_fsPhysical) {
+            case 22050: myPID.SetOutputLimits(-400000, 600000); break;  // 17% - 227%
+            case 32000: myPID.SetOutputLimits(-400000, 285000); break;  // 17% - 159%
+            case 44100: myPID.SetOutputLimits(-400000,  77000); break;  // 17% - 116%
+            case 48000: myPID.SetOutputLimits(-400000,  29000); break;  // 17% - 107%
+            default:    myPID.SetOutputLimits(-400000,  77000);         // lets assume 44.2 kHz here
+          }
+
+          PRINTLN("Frame offset: ");
+          PRINT(_frameOffset);
+          PRINTLN("\"");
+          _frameOffset = 0;
+          PRINTLN("Out of the Looping State");
+
+          break;
+        
 
     case PAUSE:
       lastSampleCounterHaltPos = getSampleCount();
@@ -445,8 +561,8 @@ void Audio::drawPlayingMenu() {
   else {
     if (currentMillis % 700 > 350)
       u8g2->drawXBMP(2, 54, sync_xbm_width, sync_xbm_height, sync_xbm_bits);
-    u8g2->setFont(FONT08);
-    u8g2->setCursor(24,62);
+      u8g2->setFont(FONT08);
+      u8g2->setCursor(24,62);
     if (_frameOffset > 0)
       u8g2->print("+");
     u8g2->print(_frameOffset);
@@ -530,6 +646,7 @@ uint16_t Audio::getSamplingRate() {
 
 bool Audio::loadTrack() {
   for (bool isLoop : { false, true })  {
+    looping = isLoop;
     strcpy(_filename, (isLoop) ? "000-00-L.ogg" : "000-00.ogg");
     ui.insertPaddedInt(&_filename[0], _trackNum, 10, 3);
     for (_fps=12; _fps<=25; _fps++) {                             // guess fps
@@ -542,6 +659,10 @@ bool Audio::loadTrack() {
   }
   return false;                                         // file not found
 }
+
+bool Audio::isAuto() {
+
+};
 
 uint16_t Audio::selectTrackScreen() {
   static uint16_t trackNum = 1;

@@ -1,6 +1,7 @@
 #pragma once
 #include <Adafruit_VS1053.h>
 #include <QuickPID.h>
+#include "mode.h"
 
 class Audio : public Adafruit_VS1053_FilePlayer {
   public:
@@ -18,6 +19,7 @@ class Audio : public Adafruit_VS1053_FilePlayer {
 
     uint16_t _fsPhysical = 0;
     char _filename[13] = {0};
+    char autoLoop[12] = {0};
     bool _isLoop = false;
     uint8_t _fps = 0;
     uint16_t _trackNum = 0;
@@ -30,6 +32,10 @@ class Audio : public Adafruit_VS1053_FilePlayer {
     uint16_t deltaToFramesDivider;
     uint16_t impToAudioSecondsDivider;
 
+    Mode playbackMode;
+
+    Mode detectMode();
+    bool isAuto();
     bool loadPatch();
     void enableResampler();
     void adjustSamplerate(signed long ppm2);
