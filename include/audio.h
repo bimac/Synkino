@@ -11,6 +11,7 @@ class Audio : public Adafruit_VS1053_FilePlayer {
     const char getRevision();
     static void countISR();
     static void leaderISR();
+    bool loadTrack(uint16_t);
 
   private:
     QuickPID myPID = QuickPID(&Input, &Output, &Setpoint);

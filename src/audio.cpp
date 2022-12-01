@@ -155,7 +155,8 @@ bool Audio::selectTrack() {
   attachInterrupt(STARTMARK, leaderISR, CHANGE);
 
   // 2. Pick a file and run a few checks
-  _trackNum = selectTrackScreen();                            // pick a track number
+  if (_trackNum != 999)
+    _trackNum = selectTrackScreen();                          // pick a track number
   if (_trackNum==0)
     return true;                                              // back to main-menu
   if (!loadTrack())                                           // try to load track
@@ -526,6 +527,11 @@ int32_t Audio::average(int32_t input) {
 
 uint16_t Audio::getSamplingRate() {
   return sciRead(SCI_AUDATA) & 0xfffe;    // Mask the Mono/Stereo Bit
+}
+
+bool Audio::loadTrack(uint16_t trackNum) {
+  _trackNum = trackNum;
+  return loadTrack();
 }
 
 bool Audio::loadTrack() {

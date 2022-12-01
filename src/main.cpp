@@ -110,8 +110,11 @@ void setup(void) {
     mtpTimer.begin([]() { MTP.loop(); }, 50_Hz);
   #endif
 
-  projector.loadLast();
+  // check for autostart file
+  if (musicPlayer.loadTrack(999))
+    myState = MENU_SELECT_TRACK;
 
+  projector.loadLast();
   PRINTLN("Startup complete.\n");
 }
 
