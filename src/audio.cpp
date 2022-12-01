@@ -65,6 +65,8 @@ extern PolledEncoder enc;
 #define SHUTDOWN               254
 #define QUIT                   255
 
+#define SYNC_OFFSET_EIKI       30
+
 extern UI ui;
 extern Projector projector;
 
@@ -73,6 +75,7 @@ bool looping = false;
 bool runPID = false;
 PeriodicTimer pidTimer(TCK);
 volatile uint32_t totalImpCounter = 0;
+volatile uint32_t prevImpCounter = 0;
 
 // Constructor
 Audio::Audio() : Adafruit_VS1053_FilePlayer{VS1053_RST, VS1053_CS, VS1053_DCS, VS1053_DREQ, VS1053_SDCS} {
@@ -156,7 +159,6 @@ void Audio::countISR() {
 
 bool Audio::selectTrack() {
   EEPROMstruct pConf = projector.config();        // get projector configuration
-//  uint8_t state = CHECK_FOR_LEADER;
   state = CHECK_FOR_LEADER;
   bool showOffsetCorrectionInput = false;
   currentlyLooping = false;
@@ -211,6 +213,9 @@ bool Audio::selectTrack() {
   _frameOffset             = 0;
   sampleCountBaseLine      = 0;
   lastSampleCounterHaltPos = 0;
+  //syncOffsetImps           = 0;
+
+ // syncOffsetImps           = SYNC_OFFSET_EIKI * _fsPhysical;
   syncOffsetImps           = 0;
   Setpoint                 = 0;
   Input                    = 0;
@@ -245,7 +250,9 @@ bool Audio::selectTrack() {
         state = WAIT_FOR_STARTMARK;
       } else
         state = OFFER_MANUAL_START;
-      break;
+      PRINTLN("Offset =");
+      PRINTLN(_frameOffset); 
+break;
 
     case OFFER_MANUAL_START:
       if (ui.userInterfaceMessage("Can't detect film leader.",
@@ -270,43 +277,48 @@ bool Audio::selectTrack() {
       digitalWriteFast(LED_BUILTIN, LOW);
       totalImpCounter = 0;
       state = WAIT_FOR_OFFSET;
-      break;
+      PRINTLN("Offset =");
+      PRINTLN(_frameOffset); 
+break;
 
     case WAIT_FOR_OFFSET:
       if ((totalImpCounter/pConf.shutterBladeCount) < pConf.startmarkOffset)
         continue;
       state = START;
-      break;
+      PRINTLN("Offset =");
+      PRINTLN(_frameOffset); 
+break;
 
     case START:
       totalImpCounter = 0;
-      pausePlaying(false);
       PRINTLN("Starting playback.");
-      sampleCountBaseLine = getSampleCount();
       pidTimer.begin([]() { runPID = true; }, 10_Hz);
       buzzer.play(1000,42); // play 2-pop ;-)
       enc.setValue(0);
       enc.buttonChanged();
       state = PLAYING;
-      PRINTLN("Run PID");
-      PRINTLN(runPID);
+      PRINTLN("SampleCount before clearSampleCounter");
+      PRINTLN(getSampleCount());
       clearSampleCounter();
-
+      //restoreSampleCounter(0);
+      delay(1000);
+      PRINTLN("SampleCount after clearSampleCounter");
+      PRINTLN(getSampleCount());
+      //PRINTLN("SampleCount");
+      //PRINTLN(getSampleCount());
       currentlyLooping = false;      
-      
+      pausePlaying(false);
+
+      sampleCountBaseLine = getSampleCount();
       break;
 
     case PLAYING:
-      //PRINTLN("State Playing");
-      //speedControlPID();
 
-      PRINTLN(_frameOffset);
       if (runPID) {
         speedControlPID();
         runPID = false;
         state  = handlePause();
       }
-      //PRINTLN(state);
       if (enc.buttonChanged() && enc.getButton()) {
         showOffsetCorrectionInput = !showOffsetCorrectionInput;
         if (showOffsetCorrectionInput)
@@ -335,12 +347,10 @@ bool Audio::selectTrack() {
         }
       }
 
-      //PRINTLN(state);
       
       break;
 
     case PAUSE:
-      //PRINTLN("TONS?");
       lastSampleCounterHaltPos = getSampleCount();
       pausePlaying(true);
       pidTimer.stop();
@@ -376,7 +386,7 @@ bool Audio::selectTrack() {
    case LOOP:
 
       noInterrupts();
-
+      stopPlaying();
       currentlyLooping = true;      
 
       detachInterrupt(IMPULSE);
@@ -406,7 +416,7 @@ bool Audio::selectTrack() {
       PRINT(_filename);
       PRINTLN("\"");
       setVolume(254,254);                 // mute
-      clearSampleCounter();
+      //clearSampleCounter();
       PRINT("Sampling rate: ");
       PRINT(_fsPhysical);
       PRINTLN(" Hz");
@@ -424,6 +434,7 @@ bool Audio::selectTrack() {
       sampleCountBaseLine      = 0;
       lastSampleCounterHaltPos = 0;
       syncOffsetImps           = 0;
+      //syncOffsetImps           = SYNC_OFFSET_EIKI * _fsPhysical;
       Setpoint                 = 0;
       Input                    = 0;
       Output                   = 0;
@@ -452,9 +463,10 @@ bool Audio::selectTrack() {
       delay(500);                         // wait for pause
       setVolume(4,4);                     // raise volume back up for playback
 
-      clearSampleCounter();      
+      //clearSampleCounter();      
       interrupts();
-         
+      PRINTLN("Offset =");
+      PRINTLN(_frameOffset); 
     break;
         
 
@@ -494,45 +506,35 @@ static uint16_t pauseDetectedPeriod = (1000 / _fps * 3);
   }
   }
   return state;
-// PRINTLN(state);
-//  
-//  PRINTLN("Handle Pause");
-//
-//  static uint16_t pauseDetectedPeriod = (1000 / _fps * 3);
-//  static uint32_t prevTotalImpCounter = 0;
-//  static uint32_t lastImpMillis;
-//
-//  bool impsChanged = (totalImpCounter + syncOffsetImps) != prevTotalImpCounter;
-//
-//  if (paused()) {
-//    if (impsChanged){
-//      return RESUME;
-//    }
-//    else {
-//      return PAUSED;
-//    }
-//  } 
-//  else {
-//    if (impsChanged) {
-//      PRINTLN("Aquí");
-//      prevTotalImpCounter = totalImpCounter + syncOffsetImps;
-//      lastImpMillis = millis();
-//      return RESUME;
-//    } 
-//    else if ((millis() - lastImpMillis) >= pauseDetectedPeriod) {
-//      return PAUSE;
-//    }
-//    //return PLAYING;
-//  }
-//
+
 }
 
 void Audio::speedControlPID() {
-  if (!currentlyLooping){
-  uint32_t actualSampleCount = getSampleCount() - sampleCountBaseLine;
-  int32_t desiredSampleCount = (totalImpCounter + syncOffsetImps) * impToSamplerateFactor;
+//  if (totalImpCounter - prevImpCounter < 15 || prevImpCounter > totalImpCounter){ 
+  if (totalImpCounter < 100){
+    prevImpCounter = totalImpCounter;
+    currentlyLooping = false;
+  } 
+  else {
+    actualSampleCount = getSampleCount() - sampleCountBaseLine + _fsPhysical;
+    desiredSampleCount = (totalImpCounter + syncOffsetImps) * impToSamplerateFactor - _fsPhysical;
+ // uint32_t actualSampleCount = getSampleCount() - sampleCountBaseLine;
+
+//  int32_t desiredSampleCount = totalImpCounter * impToSamplerateFactor;
   long delta = (actualSampleCount - desiredSampleCount);
 
+//PRINT("getSampleCount ");
+//PRINTLN(getSampleCount());
+  PRINT("actualSampleCount ");
+  PRINTLN(actualSampleCount);
+ // PRINT("sampleCountBaseLine "); 
+ // PRINTLN(sampleCountBaseLine); 
+  PRINT("desiredSampleCount ");
+  PRINTLN(desiredSampleCount);
+  PRINT("totalImpCounter ");
+  PRINTLN(totalImpCounter);
+  PRINT("delta ");
+  PRINTLN(delta);
   Input = average(delta);
   myPID.Compute();
   adjustSamplerate(Output);
@@ -679,6 +681,7 @@ void Audio::handleFrameCorrectionOffsetInput() {
 }
 
 int32_t Audio::average(int32_t input) {
+ // #define numReadings 6                       // window size for sliding average ORIGINAL
   #define numReadings 6                       // window size for sliding average
   static int32_t readings[numReadings] = {0};
   static int32_t total = 0;
