@@ -433,7 +433,7 @@ break;
       _frameOffset             = 0;
       sampleCountBaseLine      = 0;
       lastSampleCounterHaltPos = 0;
-      syncOffsetImps           = 0;
+      //syncOffsetImps           = 0;
       //syncOffsetImps           = SYNC_OFFSET_EIKI * _fsPhysical;
       Setpoint                 = 0;
       Input                    = 0;
@@ -497,10 +497,8 @@ static uint16_t pauseDetectedPeriod = (1000 / _fps * 3);
       prevTotalImpCounter = totalImpCounter + syncOffsetImps;
       lastImpMillis = millis();
       state = PLAYING;
-      //PRINTLN("Aqui tambien");
     }
     else if ((millis() - lastImpMillis) >= pauseDetectedPeriod) {
-      //PRINTLN("ACA");
       state = PAUSE;
     }
   }
@@ -510,7 +508,6 @@ static uint16_t pauseDetectedPeriod = (1000 / _fps * 3);
 }
 
 void Audio::speedControlPID() {
-//  if (totalImpCounter - prevImpCounter < 15 || prevImpCounter > totalImpCounter){ 
   if (totalImpCounter < 100){
     prevImpCounter = totalImpCounter;
     currentlyLooping = false;
@@ -519,32 +516,28 @@ void Audio::speedControlPID() {
     actualSampleCount = getSampleCount() - sampleCountBaseLine + _fsPhysical;
     desiredSampleCount = (totalImpCounter + syncOffsetImps) * impToSamplerateFactor - _fsPhysical;
  // uint32_t actualSampleCount = getSampleCount() - sampleCountBaseLine;
-
 //  int32_t desiredSampleCount = totalImpCounter * impToSamplerateFactor;
-  long delta = (actualSampleCount - desiredSampleCount);
-
-//PRINT("getSampleCount ");
-//PRINTLN(getSampleCount());
-  PRINT("actualSampleCount ");
-  PRINTLN(actualSampleCount);
- // PRINT("sampleCountBaseLine "); 
- // PRINTLN(sampleCountBaseLine); 
-  PRINT("desiredSampleCount ");
-  PRINTLN(desiredSampleCount);
-  PRINT("totalImpCounter ");
-  PRINTLN(totalImpCounter);
-  PRINT("delta ");
-  PRINTLN(delta);
-  Input = average(delta);
-  myPID.Compute();
-  adjustSamplerate(Output);
-
-  _frameOffset = Input / deltaToFramesDivider;
-
-  //This puts nifty CSV to the Console, to graph PID results.
-  //PRINTF("Delta:%d,Average:%f,FrameOffset: %d\n", delta, Input, _frameOffset);
-  //PRINTF("Input:%0.3f,Output:%0.3f\n", Input, Output);
-  //PRINTF("P:%0.5f,I:%0.5f,D:%0.5f\n", myPID.GetPterm(), myPID.GetIterm(), myPID.GetDterm());
+    long delta = (actualSampleCount - desiredSampleCount);
+   //PRINT("getSampleCount ");
+   //PRINTLN(getSampleCount());
+    PRINT("actualSampleCount ");
+    PRINTLN(actualSampleCount);
+    PRINT("desiredSampleCount ");
+    PRINTLN(desiredSampleCount);
+    PRINT("totalImpCounter ");
+    PRINTLN(totalImpCounter);
+    PRINT("delta ");
+    PRINTLN(delta);
+    Input = average(delta);
+    myPID.Compute();
+    adjustSamplerate(Output);
+  
+    _frameOffset = Input / deltaToFramesDivider;
+  
+    //This puts nifty CSV to the Console, to graph PID results.
+    //PRINTF("Delta:%d,Average:%f,FrameOffset: %d\n", delta, Input, _frameOffset);
+    //PRINTF("Input:%0.3f,Output:%0.3f\n", Input, Output);
+    //PRINTF("P:%0.5f,I:%0.5f,D:%0.5f\n", myPID.GetPterm(), myPID.GetIterm(), myPID.GetDterm());
   }
 }
 
