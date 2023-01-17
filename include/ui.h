@@ -14,8 +14,6 @@ extern U8G2* u8g2;
 extern PolledEncoder enc;
 extern int8_t encDir;
 
-uint8_t u8x8_GetMenuEvent(u8x8_t);
-
 class UI {
   public:
     UI(void);
