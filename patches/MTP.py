@@ -5,7 +5,7 @@ Import("env")
 
 # only continue if MTPDISK is actually being used
 if not any(a in ["-D USB_MTPDISK_SERIAL", "-D USB_MTPDISK"] for a in env["BUILD_FLAGS"]):
-    Return
+    Return()
 
 # ensure that diff_match_patch is available
 try:
@@ -18,9 +18,9 @@ except ImportError:
 dnMTP = join(env["PROJECT_LIBDEPS_DIR"], env["BOARD"], "MTP_Teensy")
 fnPatchFlag = join(dnMTP, ".patched")
 
-# only continue if we successfully constructed the
+# only continue if we successfully constructed the path name
 if not isdir(dnMTP):
-    Return
+    Return()
 
 # patch file only if we didn't do it before
 if not isfile(fnPatchFlag):

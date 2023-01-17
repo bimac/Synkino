@@ -22,7 +22,7 @@ using namespace EncoderTool;
 #include "menus.h"        // menu definitions, positions of menu items
 
 // Use MTP disk?
-#if defined USB_MTBDISK || defined USB_MTPDISK_SERIAL
+#if defined USB_MTPDISK || defined USB_MTPDISK_SERIAL
   #include <SD.h>
   #include <MTP_Teensy.h>
   #define CS_SD VS1053_SDCS
@@ -110,8 +110,11 @@ void setup(void) {
     mtpTimer.begin([]() { MTP.loop(); }, 50_Hz);
   #endif
 
-  projector.loadLast();
+  // check for autostart file
+  if (musicPlayer.loadTrack(999))
+    myState = MENU_SELECT_TRACK;
 
+  projector.loadLast();
   PRINTLN("Startup complete.\n");
 }
 

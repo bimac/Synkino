@@ -159,7 +159,7 @@ void Projector::e2dump(void) {
 #if defined(SERIALDEBUG) || defined(HWSERIALDEBUG)
   // Sorry, I realize this is an unreadable mess ...
   char bufferInput[16];         // buffer holding data from EEPROM
-  char bufferOutput[82] = {0};  // buffer holding data to be printed
+  char bufferOutput[83] = {0};  // buffer holding data to be printed
   for (uint16_t address = 0; address <= EEPROM_BYTES_REQUIRED; address += 16) {
     EEPROM.get(address, bufferInput); // get data from EEPROM
     strcpy(bufferOutput,"\n 0x00000:  00 00 00 00 00 00 00 00   00 00 00 00 00 00 00 00   ........  ........");
