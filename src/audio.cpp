@@ -155,14 +155,17 @@ bool Audio::selectTrack() {
   attachInterrupt(STARTMARK, leaderISR, CHANGE);
 
   // 2. Pick a file and run a few checks
-  if (_trackNum != 999)
+  if (_trackNum != 999) {
     _trackNum = selectTrackScreen();                          // pick a track number
-  if (_trackNum==0)
-    return true;                                              // back to main-menu
-  if (!loadTrack())                                           // try to load track
+    if (_trackNum == 0 )
+      return true;                                            // back to main-menu
+  }
+  if (!loadTrack(_trackNum))                                  // try to load track
     return ui.showError("File not found.");                   // back to track selection
-  if (!connected())                                           // check if audio is plugged in
-    return ui.showError("Please connect audio device.");
+  if (!connected()) {                                         // check if audio is plugged in
+    ui.showError("Please connect audio device.");
+    return _trackNum == 999;
+  }
   if (!digitalReadFast(STARTMARK))                            // check for leader
     state = OFFER_MANUAL_START;
 
@@ -530,17 +533,13 @@ uint16_t Audio::getSamplingRate() {
 }
 
 bool Audio::loadTrack(uint16_t trackNum) {
-  _trackNum = trackNum;
-  return loadTrack();
-}
-
-bool Audio::loadTrack() {
   for (bool isLoop : { false, true })  {
     strcpy(_filename, (isLoop) ? "000-00-L.ogg" : "000-00.ogg");
-    ui.insertPaddedInt(&_filename[0], _trackNum, 10, 3);
+    ui.insertPaddedInt(&_filename[0], trackNum, 10, 3);
     for (_fps=12; _fps<=25; _fps++) {                             // guess fps
       ui.insertPaddedInt(&_filename[4], _fps, 10, 2);
       if (SD.exists(_filename)) {                                 // file found!
+        _trackNum = trackNum;
         _isLoop = isLoop;
         return true;
       }
