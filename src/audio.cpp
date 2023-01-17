@@ -130,11 +130,6 @@ uint8_t Audio::begin() {
   return 0;                                       // return false (no error)
 }
 
-Mode Audio::detectMode(){
-
-
-}
-
 bool Audio::SDinserted() {
   return digitalReadFast(VS1053_SDCD);
 }
@@ -255,7 +250,7 @@ bool Audio::selectTrack() {
       } else
         state = OFFER_MANUAL_START;
       PRINTLN("Offset =");
-      PRINTLN(_frameOffset); 
+      PRINTLN(_frameOffset);
 break;
 
     case OFFER_MANUAL_START:
@@ -282,7 +277,7 @@ break;
       totalImpCounter = 0;
       state = WAIT_FOR_OFFSET;
       PRINTLN("Offset =");
-      PRINTLN(_frameOffset); 
+      PRINTLN(_frameOffset);
 break;
 
     case WAIT_FOR_OFFSET:
@@ -290,7 +285,7 @@ break;
         continue;
       state = START;
       PRINTLN("Offset =");
-      PRINTLN(_frameOffset); 
+      PRINTLN(_frameOffset);
 break;
 
     case START:
@@ -310,7 +305,7 @@ break;
       PRINTLN(getSampleCount());
       //PRINTLN("SampleCount");
       //PRINTLN(getSampleCount());
-      currentlyLooping = false;      
+      currentlyLooping = false;
       pausePlaying(false);
 
       sampleCountBaseLine = getSampleCount();
@@ -351,7 +346,7 @@ break;
         }
       }
 
-      
+
       break;
 
     case PAUSE:
@@ -391,18 +386,17 @@ break;
 
       noInterrupts();
       stopPlaying();
-      currentlyLooping = true;      
+      currentlyLooping = true;
 
       detachInterrupt(IMPULSE);
       drawWaitForPlayingMenu();
-      pidTimer.end(); 
+      pidTimer.end();
       runPID = false;
       myPID.SetMode(myPID.Control::manual);
       PRINTLN("Stopped playback.");
 
       EEPROMstruct pConf = projector.config();        // get projector configuration
       state = CHECK_FOR_LEADER;
-      bool showOffsetCorrectionInput = false;
 
       // 1. Indicate presence of film leader using LED
       attachInterrupt(STARTMARK, leaderISR, CHANGE);
@@ -432,8 +426,8 @@ break;
       //setVolume(4,4);                     // raise volume back up for playback
       //Kill PID timer
       // 7. Prepare PID
-      
-      
+
+
       _frameOffset             = 0;
       sampleCountBaseLine      = 0;
       lastSampleCounterHaltPos = 0;
@@ -444,7 +438,7 @@ break;
       Output                   = 0;
 
       totalImpCounter          = 0;
-      
+
       while (average(0) != 0) {}
 
       myPID.SetMode(myPID.Control::timer);
@@ -467,12 +461,12 @@ break;
       delay(500);                         // wait for pause
       setVolume(4,4);                     // raise volume back up for playback
 
-      //clearSampleCounter();      
+      //clearSampleCounter();
       interrupts();
       PRINTLN("Offset =");
-      PRINTLN(_frameOffset); 
+      PRINTLN(_frameOffset);
     break;
-        
+
 
    }
   }
@@ -495,7 +489,7 @@ static uint16_t pauseDetectedPeriod = (1000 / _fps * 3);
       state =  RESUME;
     else
       state = PAUSED;
-  } 
+  }
   else {  //if !paused()
     if (impsChanged) {
       prevTotalImpCounter = totalImpCounter + syncOffsetImps;
@@ -515,7 +509,7 @@ void Audio::speedControlPID() {
   if (totalImpCounter < 100){
     prevImpCounter = totalImpCounter;
     currentlyLooping = false;
-  } 
+  }
   else {
     actualSampleCount = getSampleCount() - sampleCountBaseLine + _fsPhysical;
     desiredSampleCount = (totalImpCounter + syncOffsetImps) * impToSamplerateFactor - _fsPhysical;
@@ -535,9 +529,9 @@ void Audio::speedControlPID() {
     Input = average(delta);
     myPID.Compute();
     adjustSamplerate(Output);
-  
+
     _frameOffset = Input / deltaToFramesDivider;
-  
+
     //This puts nifty CSV to the Console, to graph PID results.
     //PRINTF("Delta:%d,Average:%f,FrameOffset: %d\n", delta, Input, _frameOffset);
     //PRINTF("Input:%0.3f,Output:%0.3f\n", Input, Output);
@@ -711,10 +705,6 @@ bool Audio::loadTrack(uint16_t trackNum) {
   }
   return false;                                         // file not found
 }
-
-bool Audio::isAuto() {
-
-};
 
 uint16_t Audio::selectTrackScreen() {
   static uint16_t trackNum = 1;

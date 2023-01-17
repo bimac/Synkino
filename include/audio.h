@@ -38,10 +38,6 @@ class Audio : public Adafruit_VS1053_FilePlayer {
     uint16_t deltaToFramesDivider;
     uint16_t impToAudioSecondsDivider;
 
-    Mode playbackMode;
-
-    Mode detectMode();
-    bool isAuto();
     bool loadPatch();
     void enableResampler();
     void adjustSamplerate(signed long ppm2);
