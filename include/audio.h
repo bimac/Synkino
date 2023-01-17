@@ -26,10 +26,6 @@ class Audio : public Adafruit_VS1053_FilePlayer {
     uint8_t _fps = 0;
     uint16_t _trackNum = 0;
     int32_t _frameOffset = 0;
-
-    uint32_t actualSampleCount;
-    int32_t desiredSampleCount;
-
     uint32_t lastSampleCounterHaltPos = 0;
     int32_t  syncOffsetImps = 0;
     uint32_t sampleCountBaseLine = 0;

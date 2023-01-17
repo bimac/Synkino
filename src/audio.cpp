@@ -71,7 +71,6 @@ extern UI ui;
 extern Projector projector;
 
 
-bool looping = false;
 bool runPID = false;
 PeriodicTimer pidTimer(TCK);
 volatile uint32_t totalImpCounter = 0;
@@ -136,7 +135,6 @@ bool Audio::SDinserted() {
 
 void Audio::leaderISR() {
   digitalWriteFast(LED_BUILTIN, digitalReadFast(STARTMARK));
-
 }
 
 void Audio::countISR() {
@@ -198,7 +196,7 @@ bool Audio::selectTrack() {
   PRINT(_fsPhysical);
   PRINTLN(" Hz");
   PRINTLN("Looping: ");
-  PRINT(looping);
+  PRINT(_isLoop);
   PRINTLN("\"");
   delay(500);                         // wait for pause
   setVolume(4,4);                     // raise volume back up for playback
@@ -242,7 +240,7 @@ bool Audio::selectTrack() {
 
     switch (state) {
     case CHECK_FOR_LEADER:
-    PRINTLN("State = Check for leader");
+      PRINTLN("State = Check for leader");
       if (digitalReadFast(STARTMARK)) {
         PRINT("Waiting for start mark ... ");
         drawWaitForPlayingMenu();
@@ -251,7 +249,7 @@ bool Audio::selectTrack() {
         state = OFFER_MANUAL_START;
       PRINTLN("Offset =");
       PRINTLN(_frameOffset);
-break;
+      break;
 
     case OFFER_MANUAL_START:
       if (ui.userInterfaceMessage("Can't detect film leader.",
@@ -278,7 +276,7 @@ break;
       state = WAIT_FOR_OFFSET;
       PRINTLN("Offset =");
       PRINTLN(_frameOffset);
-break;
+      break;
 
     case WAIT_FOR_OFFSET:
       if ((totalImpCounter/pConf.shutterBladeCount) < pConf.startmarkOffset)
@@ -286,7 +284,7 @@ break;
       state = START;
       PRINTLN("Offset =");
       PRINTLN(_frameOffset);
-break;
+      break;
 
     case START:
       totalImpCounter = 0;
@@ -312,7 +310,6 @@ break;
       break;
 
     case PLAYING:
-
       if (runPID) {
         speedControlPID();
         runPID = false;
@@ -339,7 +336,7 @@ break;
         state = SHUTDOWN;
       }
 
-      if (looping){
+      if (_isLoop){
         if (digitalReadFast(STARTMARK)){
           attachInterrupt(STARTMARK, leaderISR, CHANGE);
           state = LOOP;
@@ -419,7 +416,7 @@ break;
       PRINT(_fsPhysical);
       PRINTLN(" Hz");
       PRINTLN("Looping: ");
-      PRINT(looping);
+      PRINT(_isLoop);
       PRINTLN("\"");
 
       //delay(500);                         // wait for pause
@@ -466,8 +463,6 @@ break;
       PRINTLN("Offset =");
       PRINTLN(_frameOffset);
     break;
-
-
    }
   }
   u8g2->setFont(FONT10);
@@ -511,21 +506,21 @@ void Audio::speedControlPID() {
     currentlyLooping = false;
   }
   else {
-    actualSampleCount = getSampleCount() - sampleCountBaseLine + _fsPhysical;
-    desiredSampleCount = (totalImpCounter + syncOffsetImps) * impToSamplerateFactor - _fsPhysical;
- // uint32_t actualSampleCount = getSampleCount() - sampleCountBaseLine;
-//  int32_t desiredSampleCount = totalImpCounter * impToSamplerateFactor;
+    uint32_t actualSampleCount = getSampleCount() - sampleCountBaseLine + _fsPhysical;
+    int32_t desiredSampleCount = (totalImpCounter + syncOffsetImps) * impToSamplerateFactor - _fsPhysical;
+    // uint32_t actualSampleCount = getSampleCount() - sampleCountBaseLine;
+    // int32_t desiredSampleCount = totalImpCounter * impToSamplerateFactor;
     long delta = (actualSampleCount - desiredSampleCount);
-   //PRINT("getSampleCount ");
-   //PRINTLN(getSampleCount());
-    PRINT("actualSampleCount ");
-    PRINTLN(actualSampleCount);
-    PRINT("desiredSampleCount ");
-    PRINTLN(desiredSampleCount);
-    PRINT("totalImpCounter ");
-    PRINTLN(totalImpCounter);
-    PRINT("delta ");
-    PRINTLN(delta);
+    // PRINT("getSampleCount ");
+    // PRINTLN(getSampleCount());
+    // PRINT("actualSampleCount ");
+    // PRINTLN(actualSampleCount);
+    // PRINT("desiredSampleCount ");
+    // PRINTLN(desiredSampleCount);
+    // PRINT("totalImpCounter ");
+    // PRINTLN(totalImpCounter);
+    // PRINT("delta ");
+    // PRINTLN(delta);
     Input = average(delta);
     myPID.Compute();
     adjustSamplerate(Output);
@@ -605,8 +600,8 @@ void Audio::drawPlayingMenu() {
   else {
     if (currentMillis % 700 > 350)
       u8g2->drawXBMP(2, 54, sync_xbm_width, sync_xbm_height, sync_xbm_bits);
-      u8g2->setFont(FONT08);
-      u8g2->setCursor(24,62);
+    u8g2->setFont(FONT08);
+    u8g2->setCursor(24, 62);
     if (_frameOffset > 0)
       u8g2->print("+");
     u8g2->print(_frameOffset);
@@ -691,7 +686,6 @@ uint16_t Audio::getSamplingRate() {
 
 bool Audio::loadTrack(uint16_t trackNum) {
   for (bool isLoop : { false, true })  {
-    looping = isLoop;
     strcpy(_filename, (isLoop) ? "000-00-L.ogg" : "000-00.ogg");
     ui.insertPaddedInt(&_filename[0], trackNum, 10, 3);
     for (_fps=12; _fps<=25; _fps++) {                             // guess fps
