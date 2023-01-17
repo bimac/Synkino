@@ -1,7 +1,6 @@
 #pragma once
 #include <Adafruit_VS1053.h>
 #include <QuickPID.h>
-#include "mode.h"
 
 class Audio : public Adafruit_VS1053_FilePlayer {
   public:
