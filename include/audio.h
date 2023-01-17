@@ -11,6 +11,7 @@ class Audio : public Adafruit_VS1053_FilePlayer {
     const char getRevision();
     static void countISR();
     static void leaderISR();
+    bool loadTrack(uint16_t);
 
   private:
     QuickPID myPID = QuickPID(&Input, &Output, &Setpoint);
@@ -50,7 +51,6 @@ class Audio : public Adafruit_VS1053_FilePlayer {
     void handleFrameCorrectionOffsetInput();
     uint8_t drawTrackLoadedMenu();
     uint8_t drawTrackLoadedMenu(uint8_t);
-    bool loadTrack();
     uint16_t getSamplingRate();
     uint16_t getBitrate();
     uint16_t readWRAM(uint16_t);
