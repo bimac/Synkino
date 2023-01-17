@@ -12,6 +12,8 @@ class Audio : public Adafruit_VS1053_FilePlayer {
     static void countISR();
     static void leaderISR();
     bool loadTrack(uint16_t);
+    bool currentlyLooping;
+    uint8_t state;
 
   private:
     QuickPID myPID = QuickPID(&Input, &Output, &Setpoint);
@@ -19,11 +21,11 @@ class Audio : public Adafruit_VS1053_FilePlayer {
 
     uint16_t _fsPhysical = 0;
     char _filename[13] = {0};
+    char autoLoop[12] = {0};
     bool _isLoop = false;
     uint8_t _fps = 0;
     uint16_t _trackNum = 0;
     int32_t _frameOffset = 0;
-
     uint32_t lastSampleCounterHaltPos = 0;
     int32_t  syncOffsetImps = 0;
     uint32_t sampleCountBaseLine = 0;

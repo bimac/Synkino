@@ -10,7 +10,8 @@ SynkinoLC started as a fork of [fwachsmuth/Synkino](https://github.com/fwachsmut
 * The firmware has been optimized to fit the 62K flash of the affordable but powerful Teensy LC microcontroller board (with a few limitations - see below). Teensy 3.2 is also supported.
 * Unlike the original Synkino, SynkinoLC is not designed for battery operation. Use any micro-USB phone charger as a power supply unit.
 * When connected to a host via USB you'll have direct access to SynkinoLC's SD card via MTP (Teensy 3.2 only).
-* When storing a track numbered 999 (e.g., ```999-24.ogg```) to the SD card, SynkinoLC will automatically begin playing it after start-up.
+* A film can be defined as a _loop_ by appending an ```-L``` to its name (e.g., ```001-24-L.ogg```). When splicing the loop, add a short piece of leader inbetween both ends in order to define the (re-)start of the soundtrack.
+* When storing a track numbered 999 (e.g., ```999-24.ogg```) to the SD card, SynkinoLC will automatically begin playing it after start-up. This feature is especially useful when used in combination with the loop-function (e.g., ```999-24-L.ogg```).
 
 Most parts of [Friedemann's manual for the original Synkino](https://www.filmkorn.org/synkino-instruction-manual/?lang=en) apply for SynkinoLC as well.
 
