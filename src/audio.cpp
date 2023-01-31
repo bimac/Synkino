@@ -37,6 +37,12 @@ extern PolledEncoder enc;
 #define SCI_WRAMADDR        VS1053_REG_WRAMADDR
 #define SCI_HDAT0           VS1053_REG_HDAT0
 #define SCI_HDAT1           VS1053_REG_HDAT1
+#define SCI_AIADDR          0xA
+#define SCI_VOL             0xB
+#define SCI_AICTRL0         0xC
+#define SCI_AICTRL1         0xD
+#define SCI_AICTRL2         0xE
+#define SCI_AICTRL3         0xF
 
 // extra parameters in X memory (section 10.11)
 #define PARA_CHIPID_0       0x1E00
@@ -50,6 +56,7 @@ extern PolledEncoder enc;
 #define PARA_POSITIONMSEC_0 0x1E27
 #define PARA_POSITIONMSEC_1 0x1E28
 #define PARA_RESYNC         0x1E29
+#define PARA_SAMPLECOUNT    0x1800
 
 // state labels
 #define CHECK_FOR_LEADER         0
@@ -659,17 +666,17 @@ void Audio::adjustSamplerate(signed long ppm2) {
 uint32_t Audio::getSampleCount() {
   // See section 1.3 of
   // https://www.vlsi.fi/fileadmin/software/VS10XX/vs1053b-patches.pdf
-  return sciRead32(0x1800);
+  return sciRead32(PARA_SAMPLECOUNT);
 }
 
 void Audio::clearSampleCounter() {
-  sciWrite(SCI_WRAMADDR, 0x1800);
+  sciWrite(SCI_WRAMADDR, PARA_SAMPLECOUNT);
   sciWrite(SCI_WRAM, 0);
   sciWrite(SCI_WRAM, 0);
 }
 
 void Audio::restoreSampleCounter(uint32_t samplecounter) {
-  sciWrite(SCI_WRAMADDR, 0x1800); // MSB
+  sciWrite(SCI_WRAMADDR, PARA_SAMPLECOUNT); // MSB
   sciWrite(SCI_WRAM, samplecounter);
   sciWrite(SCI_WRAM, samplecounter >> 16);
 }
