@@ -84,16 +84,12 @@ uint8_t Audio::begin() {
   PRINTLN("Initializing VS1053B ...");
   if (!Adafruit_VS1053_FilePlayer::begin())       // initialize base class
     return 2;
-  useInterrupt(VS1053_FILEPLAYER_PIN_INT);        // use VS1053 DREQ interrupt
-
   if (!loadPatch())                               // load & apply patch
     return 3;
-  enableResampler();                              // enable 15/16 resampler
-
-
+  useInterrupt(VS1053_FILEPLAYER_PIN_INT);        // use VS1053 DREQ interrupt
 
   // the DREQ interrupt seems to mess with the timing of the impulse detection
-  // which is also using an interrupt. This can be remidied by lowering the
+  // which is also using an interrupt. This can be remedied by lowering the
   // priority of the DREQ interrupt
   #if defined(__MKL26Z64__)                       // Teensy LC  [MKL26Z64]
     NVIC_SET_PRIORITY(IRQ_PORTCD, 192);
@@ -189,8 +185,9 @@ bool Audio::selectTrack() {
   PRINT("Sampling rate: ");
   PRINT(_fsPhysical);
   PRINTLN(" Hz");
-  delay(500);                         // wait for pause
-  setVolume(4,4);                     // raise volume back up for playback
+  enableResampler(_fsPhysical > 24000);     // enable 15/16 resampler if necessary
+  delay(500);                               // wait for things to settle ...
+  setVolume(4,4);                           // raise volume back up for playback
 
   // 5. Define some conversion factors
   impToSamplerateFactor    = _fsPhysical / _fps / pConf.shutterBladeCount;
@@ -637,12 +634,17 @@ bool Audio::loadPatch() {
   return false;
 }
 
-void Audio::enableResampler() {
+void Audio::enableResampler(bool enable) {
   // See section 1.6 of
   // https://www.vlsi.fi/fileadmin/software/VS10XX/vs1053b-patches.pdf
   sciWrite(SCI_WRAMADDR, 0x1e09);
-  sciWrite(SCI_WRAM, 0x0080);
-  PRINTLN("15/16 Resampler enabled.");
+  if (enable) {
+    sciWrite(SCI_WRAM, 0x0080);
+    PRINTLN("15/16 Resampler enabled.");
+  } else {
+    sciWrite(SCI_WRAM, 0x0080);
+    PRINTLN("15/16 Resampler disabled.");
+  }
 }
 
 void Audio::adjustSamplerate(signed long ppm2) {

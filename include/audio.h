@@ -32,8 +32,8 @@ class Audio : public Adafruit_VS1053_FilePlayer {
     uint16_t impToAudioSecondsDivider;
 
     bool loadPatch();
-    void enableResampler();
     void adjustSamplerate(signed long ppm2);
+    void enableResampler(bool);
     void clearSampleCounter();
     void clearErrorCounter();
     uint32_t sciRead32(uint16_t addr);
