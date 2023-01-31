@@ -2,6 +2,19 @@
 #include <Adafruit_VS1053.h>
 #include <QuickPID.h>
 
+union oggPage {
+  struct {
+    char     magicStr[4];
+    uint8_t  version;
+    uint8_t  headerType;
+    int64_t  granulePos;
+    uint32_t bitstreamSN;
+    uint32_t crc;
+    uint8_t  nSegments;
+  };
+  unsigned char header[23];
+};
+
 class Audio : public Adafruit_VS1053_FilePlayer {
   public:
     Audio(void);
@@ -53,6 +66,12 @@ class Audio : public Adafruit_VS1053_FilePlayer {
     uint8_t drawTrackLoadedMenu(uint8_t);
     uint16_t getSamplingRate();
     uint16_t getBitrate();
+
+    // related to OGG Vorbis
+    bool isOgg();
+    size_t findInFile(File*, const char*, uint8_t, size_t);
+    size_t firstAudioPage(File*);
+    int64_t granulePos(oggPage*);
 
     // see http://www.vsdsp-forum.com/phpbb/viewtopic.php?p=6679#p6679
     int16_t StreamBufferFillWords(void);

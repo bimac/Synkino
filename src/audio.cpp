@@ -707,6 +707,41 @@ const char Audio::getRevision() {
   return rev + 65;
 }
 
+bool Audio::isOgg() {
+  return sciRead(VS1053_REG_HDAT1) == 0x4F67;
+}
+
+size_t Audio::findInFile(File *file, const char *target, uint8_t length, size_t startPos) {
+  char buf[length];
+  for (uint64_t i = startPos; i <= file->size() - length; i++) {
+    file->seek(i);
+    file->read(buf, length);
+    if (!strncmp(buf, target, length)) {
+      file->seek(i);
+      return file->position();
+    }
+  }
+  return UINT32_MAX;
+}
+
+size_t Audio::firstAudioPage(File *file) {
+  const char vorbisID[7] = {5, 'v', 'o', 'r', 'b', 'i', 's'}; // search-string for Vorbis setup header
+  size_t pos = findInFile(file, vorbisID, 7, 0);              // find position of Vorbis setup header
+  return findInFile(file, "OggS", 4, pos);                    // audio starts on the next Ogg page
+}
+
+int64_t Audio::granulePos(oggPage *og) {
+  unsigned char *page = og->header;
+  int64_t granulepos = page[13] & (0xff);
+  granulepos = (granulepos << 8) | (page[12] & 0xff);
+  granulepos = (granulepos << 8) | (page[11] & 0xff);
+  granulepos = (granulepos << 8) | (page[10] & 0xff);
+  granulepos = (granulepos << 8) | (page[ 9] & 0xff);
+  granulepos = (granulepos << 8) | (page[ 8] & 0xff);
+  granulepos = (granulepos << 8) | (page[ 7] & 0xff);
+  granulepos = (granulepos << 8) | (page[ 6] & 0xff);
+  return (granulepos);
+}
 
 int16_t Audio::StreamBufferFillWords(void) {
   uint16_t wrp, rdp;
