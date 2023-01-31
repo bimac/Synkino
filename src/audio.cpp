@@ -217,12 +217,32 @@ bool Audio::selectTrack() {
   myPID.SetDerivativeMode(myPID.dMode::dOnMeas);
   myPID.SetAntiWindupMode(myPID.iAwMode::iAwClamp);
   myPID.SetTunings(pConf.p, pConf.i, pConf.d);
+
+  // Adafruit VS1035 breakout uses a 12.288 Mhz XTALI, upper limit for sample
+  // rate at 48 kHz.  Using the 15/16 resampler we have more headroom for
+  // increasing the playback rate.  The valid range for CLOCKF register is:
+  // -187000 to 511999S
+  //
+  //   ORIGINAL    15/16     RANGE FOR CLOCKF   REL CHANGE
+  //   --------   --------   ----------------   ----------
+  //    8000 Hz    7500 Hz   -187000 - 511999   63% - 200%
+  //   11025 Hz   10336 Hz   -187000 - 511999   63% - 200%
+  //   12000 Hz   11250 Hz   -187000 - 511999   63% - 200%
+  //   16000 Hz   15000 Hz   -187000 - 511999   63% - 200%
+  //   22050 Hz   20672 Hz   -187000 - 511999   63% - 200%
+  //   24000 Hz   22500 Hz   -187000 - 511999   63% - 200%
+  //   32000 Hz   30000 Hz   -187000 - 307200   63% - 160%
+  //   44100 Hz   41344 Hz   -187000 -  82427   63% - 116%
+  //   48000 Hz   45000 Hz   -187000 -  34133   63% - 107%
+  //
+  // See section 1.5 of
+  // https://www.vlsi.fi/fileadmin/software/VS10XX/vs1053b-patches.pdf
+
   switch (_fsPhysical) {
-    case 22050: myPID.SetOutputLimits(-400000, 600000); break;  // 17% - 227%
-    case 32000: myPID.SetOutputLimits(-400000, 285000); break;  // 17% - 159%
-    case 44100: myPID.SetOutputLimits(-400000,  77000); break;  // 17% - 116%
-    case 48000: myPID.SetOutputLimits(-400000,  29000); break;  // 17% - 107%
-    default:    myPID.SetOutputLimits(-400000,  77000);         // lets assume 44.2 kHz here
+    case 32000: myPID.SetOutputLimits(-187000, 307200); break;
+    case 44100: myPID.SetOutputLimits(-187000,  82430); break;
+    case 48000: myPID.SetOutputLimits(-187000,  34133); break;
+    default:    myPID.SetOutputLimits(-187000, 511999); break;
   }
 
   // 8. Run state machine
