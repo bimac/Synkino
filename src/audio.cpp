@@ -26,37 +26,10 @@ extern PolledEncoder enc;
 #define numberOfMinutes(_time_) ((_time_ / SECS_PER_MIN) % SECS_PER_MIN )
 #define numberOfHours(_time_)   ((_time_ % SECS_PER_DAY) / SECS_PER_HOUR)
 
-// some synonyms for backward compatibility
-#define SCI_MODE            VS1053_REG_MODE
-#define SCI_STATUS          VS1053_REG_STATUS
-#define SCI_BASS            VS1053_REG_BASS
-#define SCI_CLOCKF          VS1053_REG_CLOCKF
-#define SCI_DECODE_TIME     VS1053_REG_DECODETIME
-#define SCI_AUDATA          VS1053_REG_AUDATA
-#define SCI_WRAM            VS1053_REG_WRAM
-#define SCI_WRAMADDR        VS1053_REG_WRAMADDR
-#define SCI_HDAT0           VS1053_REG_HDAT0
-#define SCI_HDAT1           VS1053_REG_HDAT1
-#define SCI_AIADDR          0xA
-#define SCI_VOL             0xB
-#define SCI_AICTRL0         0xC
-#define SCI_AICTRL1         0xD
-#define SCI_AICTRL2         0xE
-#define SCI_AICTRL3         0xF
-
-// extra parameters in X memory (section 10.11)
-#define PARA_CHIPID_0       0x1E00
-#define PARA_CHIPID_1       0x1E01
-#define PARA_VERSION        0x1E02
-#define PARA_CONFIG1        0x1E03
-#define PARA_PLAYSPEED      0x1E04
-#define PARA_BYTERATE       0x1E05
-#define PARA_ENDFILLBYTE    0x1E06
-#define PARA_MONOOUTPUT     0x1E09
-#define PARA_POSITIONMSEC_0 0x1E27
-#define PARA_POSITIONMSEC_1 0x1E28
-#define PARA_RESYNC         0x1E29
-#define PARA_SAMPLECOUNT    0x1800
+// some extra registers in X memory (section 10.11)
+#define VS1053_XMEM_POSITIONMSEC_0 0x1E27
+#define VS1053_XMEM_POSITIONMSEC_1 0x1E28
+#define VS1053_XMEM_SAMPLECOUNT    0x1800
 
 // state labels
 #define CHECK_FOR_LEADER         0
@@ -553,7 +526,7 @@ int32_t Audio::average(int32_t input) {
 }
 
 uint16_t Audio::getSamplingRate() {
-  uint16_t sr = sciRead(SCI_AUDATA) & 0xfffe; // Mask the Mono/Stereo Bit
+  uint16_t sr = sciRead(VS1053_REG_AUDATA) & 0xfffe; // Mask the Mono/Stereo Bit
   return (sr == 11024) ? 11025 : sr;          // return (corrected) sample rate
 }
 
@@ -664,57 +637,57 @@ bool Audio::loadPatch() {
 void Audio::enableResampler(bool enable) {
   // See section 1.6 of
   // https://www.vlsi.fi/fileadmin/software/VS10XX/vs1053b-patches.pdf
-  sciWrite(SCI_WRAMADDR, 0x1e09);
+  sciWrite(VS1053_REG_WRAMADDR, 0x1e09);
   if (enable) {
-    sciWrite(SCI_WRAM, 0x0080);
+    sciWrite(VS1053_REG_WRAM, 0x0080);
     PRINTLN("15/16 Resampler enabled.");
   } else {
-    sciWrite(SCI_WRAM, 0x0080);
+    sciWrite(VS1053_REG_WRAM, 0x0080);
     PRINTLN("15/16 Resampler disabled.");
   }
 }
 
 void Audio::adjustSamplerate(int32_t ppm2) {
-  sciWrite(SCI_WRAMADDR, 0x1e07);
-  sciWrite(SCI_WRAM, ppm2);
-  sciWrite(SCI_WRAM, ppm2 >> 16);
-  sciWrite(SCI_WRAMADDR, 0x5b1c);
-  sciWrite(SCI_WRAM, 0);
-  sciWrite(SCI_AUDATA, sciRead(SCI_AUDATA));
+  sciWrite(VS1053_REG_WRAMADDR, 0x1e07);
+  sciWrite(VS1053_REG_WRAM, ppm2);
+  sciWrite(VS1053_REG_WRAM, ppm2 >> 16);
+  sciWrite(VS1053_REG_WRAMADDR, 0x5b1c);
+  sciWrite(VS1053_REG_WRAM, 0);
+  sciWrite(VS1053_REG_AUDATA, sciRead(VS1053_REG_AUDATA));
 }
 
 uint32_t Audio::getSampleCount() {
   // See section 1.3 of
   // https://www.vlsi.fi/fileadmin/software/VS10XX/vs1053b-patches.pdf
-  return sciRead32(PARA_SAMPLECOUNT);
+  return sciRead32(VS1053_XMEM_SAMPLECOUNT);
 }
 
 void Audio::clearSampleCounter() {
-  sciWrite(SCI_WRAMADDR, PARA_SAMPLECOUNT);
-  sciWrite(SCI_WRAM, 0);
-  sciWrite(SCI_WRAM, 0);
+  sciWrite(VS1053_REG_WRAMADDR, VS1053_XMEM_SAMPLECOUNT);
+  sciWrite(VS1053_REG_WRAM, 0);
+  sciWrite(VS1053_REG_WRAM, 0);
 }
 
 void Audio::restoreSampleCounter(uint32_t samplecounter) {
-  sciWrite(SCI_WRAMADDR, PARA_SAMPLECOUNT); // MSB
-  sciWrite(SCI_WRAM, samplecounter);
-  sciWrite(SCI_WRAM, samplecounter >> 16);
+  sciWrite(VS1053_REG_WRAMADDR, VS1053_XMEM_SAMPLECOUNT); // MSB
+  sciWrite(VS1053_REG_WRAM, samplecounter);
+  sciWrite(VS1053_REG_WRAM, samplecounter >> 16);
 }
 
 void Audio::clearErrorCounter() {
-  sciWrite(SCI_WRAMADDR, 0x5a82);
-  sciWrite(SCI_WRAM, 0);
+  sciWrite(VS1053_REG_WRAMADDR, 0x5a82);
+  sciWrite(VS1053_REG_WRAM, 0);
 }
 
 uint32_t Audio::sciRead32(uint16_t addr) {
   // See section 1.3 of
   // https://www.vlsi.fi/fileadmin/software/VS10XX/vs1053b-patches.pdf
   uint16_t msbV1, lsb, msbV2;
-  sciWrite(SCI_WRAMADDR, addr + 1);
-  msbV1 = (uint16_t)sciRead(SCI_WRAM);
-  sciWrite(SCI_WRAMADDR, addr);
-  lsb = (u_int32_t)sciRead(SCI_WRAM);
-  msbV2 = (uint16_t)sciRead(SCI_WRAM);
+  sciWrite(VS1053_REG_WRAMADDR, addr + 1);
+  msbV1 = (uint16_t)sciRead(VS1053_REG_WRAM);
+  sciWrite(VS1053_REG_WRAMADDR, addr);
+  lsb = (u_int32_t)sciRead(VS1053_REG_WRAM);
+  msbV2 = (uint16_t)sciRead(VS1053_REG_WRAM);
   if (lsb < 0x8000U) {
     msbV1 = msbV2;
   }
@@ -722,7 +695,7 @@ uint32_t Audio::sciRead32(uint16_t addr) {
 }
 
 uint16_t Audio::getBitrate() {
-  return sciRead(SCI_HDAT0) << 3;
+  return sciRead(VS1053_REG_HDAT0) << 3;
 }
 
 const char Audio::getRevision() {
@@ -739,10 +712,10 @@ int16_t Audio::StreamBufferFillWords(void) {
   uint16_t wrp, rdp;
   int16_t res;
   /* For FLAC files, stream buffer is larger */
-  int16_t bufSize = (sciRead(SCI_HDAT1) == 0x664C) ? 0x1800 : 0x400;
-  sciWrite(SCI_WRAMADDR, 0x5A7D);
-  wrp = sciRead(SCI_WRAM);
-  rdp = sciRead(SCI_WRAM);
+  int16_t bufSize = (sciRead(VS1053_REG_HDAT1) == 0x664C) ? 0x1800 : 0x400;
+  sciWrite(VS1053_REG_WRAMADDR, 0x5A7D);
+  wrp = sciRead(VS1053_REG_WRAM);
+  rdp = sciRead(VS1053_REG_WRAM);
   res = wrp-rdp;
   if (res < 0) {
     return res + bufSize;
@@ -752,7 +725,7 @@ int16_t Audio::StreamBufferFillWords(void) {
 
 int16_t Audio::StreamBufferFreeWords(void) {
   /* For FLAC files, stream buffer is larger */
-  int16_t bufSize = (sciRead(SCI_HDAT1) == 0x664C) ? 0x1800 : 0x400;
+  int16_t bufSize = (sciRead(VS1053_REG_HDAT1) == 0x664C) ? 0x1800 : 0x400;
   int16_t res = bufSize - StreamBufferFillWords();
   if (res < 2) {
     return 0;
@@ -762,9 +735,9 @@ int16_t Audio::StreamBufferFreeWords(void) {
 
 int16_t Audio::AudioBufferFillWords(void) {
   uint16_t wrp, rdp;
-  sciWrite(SCI_WRAMADDR, 0x5A80);
-  wrp = sciRead(SCI_WRAM);
-  rdp = sciRead(SCI_WRAM);
+  sciWrite(VS1053_REG_WRAMADDR, 0x5A80);
+  wrp = sciRead(VS1053_REG_WRAM);
+  rdp = sciRead(VS1053_REG_WRAM);
   return (wrp-rdp) & 4095;
 }
 
@@ -778,11 +751,11 @@ int16_t Audio::AudioBufferFreeWords(void) {
 
 uint16_t Audio::AudioBufferUnderflow(void) {
   uint16_t uFlow;
-  sciWrite(SCI_WRAMADDR, 0x5A82);
-  uFlow = sciRead(SCI_WRAM);
+  sciWrite(VS1053_REG_WRAMADDR, 0x5A82);
+  uFlow = sciRead(VS1053_REG_WRAM);
   if (uFlow) {
-    sciWrite(SCI_WRAMADDR, 0x5A82);
-    sciWrite(SCI_WRAM, 0); /* Clear */
+    sciWrite(VS1053_REG_WRAMADDR, 0x5A82);
+    sciWrite(VS1053_REG_WRAM, 0); /* Clear */
   }
   return uFlow;
 }
