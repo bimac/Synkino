@@ -136,16 +136,16 @@ void Audio::leaderISR() {
 }
 
 void Audio::countISR() {
-  noInterrupts();
   static unsigned long lastMicros = 0;
   unsigned long thisMicros = micros();
 
   if ((thisMicros - lastMicros) > 2000) {         // poor man's debounce - no periods below 2ms (500Hz)
+    noInterrupts();
     totalImpCounter++;
     lastMicros = thisMicros;
+    interrupts();
     digitalToggleFast(LED_BUILTIN);               // toggle the LED
   }
-  interrupts();
 }
 
 bool Audio::selectTrack() {
@@ -333,8 +333,7 @@ bool Audio::selectTrack() {
     case PAUSE:
       lastSampleCounterHaltPos = getSampleCount();
       pausePlaying(true);
-      PRINT("Pausing playback at sample ");
-      PRINTLN(lastSampleCounterHaltPos);
+      PRINTLN("Pausing playback.");
       myPID.SetMode(myPID.Control::manual);
       pidTimer.stop();
       state = PAUSED;
@@ -554,7 +553,8 @@ int32_t Audio::average(int32_t input) {
 }
 
 uint16_t Audio::getSamplingRate() {
-  return sciRead(SCI_AUDATA) & 0xfffe;    // Mask the Mono/Stereo Bit
+  uint16_t sr = sciRead(SCI_AUDATA) & 0xfffe; // Mask the Mono/Stereo Bit
+  return (sr == 11024) ? 11025 : sr;          // return (corrected) sample rate
 }
 
 bool Audio::loadTrack(uint16_t trackNum) {
@@ -674,7 +674,7 @@ void Audio::enableResampler(bool enable) {
   }
 }
 
-void Audio::adjustSamplerate(signed long ppm2) {
+void Audio::adjustSamplerate(int32_t ppm2) {
   sciWrite(SCI_WRAMADDR, 0x1e07);
   sciWrite(SCI_WRAM, ppm2);
   sciWrite(SCI_WRAM, ppm2 >> 16);
@@ -709,12 +709,12 @@ void Audio::clearErrorCounter() {
 uint32_t Audio::sciRead32(uint16_t addr) {
   // See section 1.3 of
   // https://www.vlsi.fi/fileadmin/software/VS10XX/vs1053b-patches.pdf
-  u_int16_t msbV1, lsb, msbV2;
+  uint16_t msbV1, lsb, msbV2;
   sciWrite(SCI_WRAMADDR, addr + 1);
-  msbV1 = (u_int16_t)sciRead(SCI_WRAM);
+  msbV1 = (uint16_t)sciRead(SCI_WRAM);
   sciWrite(SCI_WRAMADDR, addr);
   lsb = (u_int32_t)sciRead(SCI_WRAM);
-  msbV2 = (u_int16_t)sciRead(SCI_WRAM);
+  msbV2 = (uint16_t)sciRead(SCI_WRAM);
   if (lsb < 0x8000U) {
     msbV1 = msbV2;
   }

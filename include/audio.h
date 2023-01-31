@@ -15,7 +15,7 @@ class Audio : public Adafruit_VS1053_FilePlayer {
 
   private:
     QuickPID myPID = QuickPID(&Input, &Output, &Setpoint);
-    float Setpoint, Input, Output;
+    float Setpoint = 0, Input, Output;
 
     uint16_t _fsPhysical = 0;
     char _filename[13] = {0};
@@ -32,12 +32,12 @@ class Audio : public Adafruit_VS1053_FilePlayer {
     uint16_t impToAudioSecondsDivider;
 
     bool loadPatch();
-    void adjustSamplerate(signed long ppm2);
     void enableResampler(bool);
+    void adjustSamplerate(int32_t long);
     void clearSampleCounter();
     void clearErrorCounter();
-    uint32_t sciRead32(uint16_t addr);
-    void restoreSampleCounter(uint32_t samplecounter);
+    uint32_t sciRead32(uint16_t);
+    void restoreSampleCounter(uint32_t);
     int32_t average(int32_t);
     void speedControlPID();
     uint8_t handlePause();
