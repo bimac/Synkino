@@ -378,9 +378,10 @@ void Audio::speedControlPID() {
   _frameOffset = Input / deltaToFramesDivider;
 
   //This puts nifty CSV to the Console, to graph PID results.
-  //PRINTF("Delta:%d,Average:%f,FrameOffset: %d\n", delta, Input, _frameOffset);
+  //PRINTF("Input:%7.0f,Output:%7.0f,FrameOffset:%4d\n", (float) delta/10, Output, _frameOffset);
   //PRINTF("Input:%0.3f,Output:%0.3f\n", Input, Output);
   //PRINTF("P:%0.5f,I:%0.5f,D:%0.5f\n", myPID.GetPterm(), myPID.GetIterm(), myPID.GetDterm());
+  //PRINTF("SteamBufferFill:%4d,AudioBufferFill:%4d,AudioBufferUnderflow:%2d\n",StreamBufferFillWords(),AudioBufferFillWords(),AudioBufferUnderflow());
 }
 
 void Audio::drawPlayingMenuConstants() {
@@ -705,7 +706,54 @@ const char Audio::getRevision() {
 }
 
 
+int16_t Audio::StreamBufferFillWords(void) {
+  uint16_t wrp, rdp;
+  int16_t res;
+  /* For FLAC files, stream buffer is larger */
+  int16_t bufSize = (sciRead(SCI_HDAT1) == 0x664C) ? 0x1800 : 0x400;
+  sciWrite(SCI_WRAMADDR, 0x5A7D);
+  wrp = sciRead(SCI_WRAM);
+  rdp = sciRead(SCI_WRAM);
+  res = wrp-rdp;
+  if (res < 0) {
+    return res + bufSize;
+  }
+  return res;
+}
 
+int16_t Audio::StreamBufferFreeWords(void) {
+  /* For FLAC files, stream buffer is larger */
+  int16_t bufSize = (sciRead(SCI_HDAT1) == 0x664C) ? 0x1800 : 0x400;
+  int16_t res = bufSize - StreamBufferFillWords();
+  if (res < 2) {
+    return 0;
+  }
+  return res-2;
+}
 
+int16_t Audio::AudioBufferFillWords(void) {
+  uint16_t wrp, rdp;
+  sciWrite(SCI_WRAMADDR, 0x5A80);
+  wrp = sciRead(SCI_WRAM);
+  rdp = sciRead(SCI_WRAM);
+  return (wrp-rdp) & 4095;
+}
 
+int16_t Audio::AudioBufferFreeWords(void) {
+  int16_t res = 4096 - AudioBufferFillWords();
+  if (res < 2) {
+    return 0;
+  }
+  return res-2;
+}
 
+uint16_t Audio::AudioBufferUnderflow(void) {
+  uint16_t uFlow;
+  sciWrite(SCI_WRAMADDR, 0x5A82);
+  uFlow = sciRead(SCI_WRAM);
+  if (uFlow) {
+    sciWrite(SCI_WRAMADDR, 0x5A82);
+    sciWrite(SCI_WRAM, 0); /* Clear */
+  }
+  return uFlow;
+}
