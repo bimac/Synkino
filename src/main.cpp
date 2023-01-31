@@ -178,6 +178,7 @@ void loop(void) {
     attachInterrupt(IMPULSE, PULSE_ISR, CHANGE);
     ui.userInterfaceMessage("Test Impulse", "", "", "Done");
     detachInterrupt(IMPULSE);
+    digitalWriteFast(LED_BUILTIN, LOW);
     myState = MENU_MAIN;
     break;
 
