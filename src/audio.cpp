@@ -692,7 +692,7 @@ uint32_t Audio::sciRead32(uint16_t addr) {
 }
 
 uint16_t Audio::getBitrate() {
-  return (readWRAM(PARA_BYTERATE)>>7);
+  return sciRead(SCI_HDAT0) << 3;
 }
 
 const char Audio::getRevision() {
@@ -704,25 +704,8 @@ const char Audio::getRevision() {
   return rev + 65;
 }
 
-uint16_t Audio::readWRAM(uint16_t addressbyte) {
-  // adapted from https://github.com/mpflaga/Arduino_Library-vs1053_for_SdFat
-  // not quite sure what to make of this ...
-  unsigned short int tmp1, tmp2;
 
-  sciWrite(VS1053_REG_WRAMADDR, addressbyte);
-  tmp1 = sciRead(SCI_WRAM);
 
-  sciWrite(VS1053_REG_WRAMADDR, addressbyte);
-  tmp2 = sciRead(SCI_WRAM);
 
-  if(tmp1==tmp2) return tmp1;
-  sciWrite(VS1053_REG_WRAMADDR, addressbyte);
-  tmp2 = sciRead(SCI_WRAM);
 
-  if(tmp1==tmp2) return tmp1;
-  sciWrite(VS1053_REG_WRAMADDR, addressbyte);
-  tmp2 = sciRead(SCI_WRAM);
 
-  if(tmp1==tmp2) return tmp1;
-  return tmp1;
- }

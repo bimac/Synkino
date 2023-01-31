@@ -53,5 +53,4 @@ class Audio : public Adafruit_VS1053_FilePlayer {
     uint8_t drawTrackLoadedMenu(uint8_t);
     uint16_t getSamplingRate();
     uint16_t getBitrate();
-    uint16_t readWRAM(uint16_t);
 };
