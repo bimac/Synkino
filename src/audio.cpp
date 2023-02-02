@@ -4,6 +4,10 @@
 #include "pins.h"
 #include "ui.h"
 
+// #if !defined(__MKL26Z64__)
+#include "vs1053b-patches.plg"
+// #endif
+
 #include "TeensyTimerTool.h"
 using namespace TeensyTimerTool;
 #include <QuickPID.h>
@@ -12,11 +16,6 @@ using namespace TeensyTimerTool;
 using namespace EncoderTool;
 extern PolledEncoder enc;
 
-// Add patches.053 to flash?
-#ifdef INC_PATCHES
-  #include <incbin.h>
-  INCBIN(Patch, "patches.053");
-#endif
 
 // macros for time conversion
 #define SECS_PER_MIN            (60UL)
@@ -586,7 +585,6 @@ bool Audio::connected() {
 
 bool Audio::loadPatch() {
   if (SD.exists("/patches.053")) {
-    // If patches.053 is found on SD we'll always try to load it from there ...
     File file = SD.open("/patches.053", O_READ);
     uint16_t addr, n, val, i = 0;
     bool status = false;
@@ -617,15 +615,31 @@ bool Audio::loadPatch() {
     } else
       PRINTLN("error reading file.");
   }
-
-  // ... if not, we'll load it from flash memory
-  #ifdef INC_PATCHES
-    PRINT("Applying \"patches.053\" from flash ... ");
-    applyPatch(reinterpret_cast<const uint16_t *>(gPatchData), gPatchSize / 2);
-    PRINTLN("done.");
-    return true;
-  #endif
+#if !defined(__MKL26Z64__)
+  uint16_t i = 0;
+  PRINT("Applying VS1053B patches from Flash Memory ... ");
+  while (i < sizeof(plugin) / sizeof(plugin[0])) {
+    unsigned short addr, n, val;
+    addr = plugin[i++];
+    n = plugin[i++];
+    if (n & 0x8000U) {
+      n &= 0x7FFF;
+      val = plugin[i++];
+      while (n--) {
+        sciWrite(addr, val);
+      }
+    } else {
+      while (n--) {
+        val = plugin[i++];
+        sciWrite(addr, val);
+      }
+    }
+  }
+  PRINTLN("done.");
+  return true;
+#else
   return false;
+#endif
 }
 
 void Audio::enableResampler(bool enable) {
