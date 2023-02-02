@@ -43,6 +43,8 @@ extern PolledEncoder enc;
 #define SHUTDOWN               254
 #define QUIT                   255
 
+#define PID_FILTER_N            10
+
 extern UI ui;
 extern Projector projector;
 
@@ -512,15 +514,15 @@ void Audio::handleFrameCorrectionOffsetInput() {
 }
 
 int32_t Audio::average(int32_t input) {
-  #define numReadings 6                       // window size for sliding average
-  static int32_t readings[numReadings] = {0};
-  static int32_t total = 0;
-  static uint8_t readIdx = 0;
-
-  readIdx = (readIdx + 1) % numReadings;      // update array index
+  static const uint16_t n = PID_FILTER_N;
+  static int32_t readings[n] = {0};
+  static int64_t total = 0;
+  static uint32_t readIdx = 0;
+  readIdx = (readIdx + 1) % (n);              // update array index
   total = total - readings[readIdx];          // subtract previous reading from running total
   readings[readIdx] = input;                  // store new reading to array
   total += input;                             // add new reading to running total
+  return total / n;                           // calculate & return the average
 }
 
 bool Audio::loadTrack(uint16_t trackNum) {
