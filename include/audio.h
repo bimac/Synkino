@@ -56,6 +56,7 @@ class Audio : public Adafruit_VS1053_FilePlayer {
     static bool connected();
     uint16_t selectTrackScreen();
     uint32_t getSampleCount();
+    uint32_t getAudioMillis();
     void drawPlayingMenuConstants();
     void drawWaitForPlayingMenu();
     void drawPlayingMenu();
