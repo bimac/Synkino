@@ -49,7 +49,6 @@ class Audio : public Adafruit_VS1053_FilePlayer {
     void adjustSamplerate(int32_t long);
     void clearSampleCounter();
     void clearErrorCounter();
-    uint32_t sciRead32(uint16_t);
     void restoreSampleCounter(uint32_t);
     int32_t average(int32_t);
     void speedControlPID();
@@ -72,6 +71,13 @@ class Audio : public Adafruit_VS1053_FilePlayer {
     size_t findInFile(File*, const char*, uint8_t, size_t);
     size_t firstAudioPage(File*);
     int64_t granulePos(oggPage*);
+
+    // methods for reading/writing to VS1053B WRAM
+    uint16_t sciReadWRAM16(uint16_t);
+    uint32_t sciReadWRAM32(uint16_t);
+    uint32_t sciReadWRAM32Counter(uint16_t);
+    void sciWriteWRAM16(uint16_t, uint16_t);
+    void sciWriteWRAM32(uint16_t, uint32_t);
 
     // see http://www.vsdsp-forum.com/phpbb/viewtopic.php?p=6679#p6679
     int16_t StreamBufferFillWords(void);
