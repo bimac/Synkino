@@ -183,6 +183,7 @@ void loop(void) {
     ui.userInterfaceMessage("Test Impulse", "", "", "Done");
     detachInterrupt(IMPULSE);
     digitalWriteFast(LED_BUILTIN, LOW);
+    buzzer.quiet();
     myState = MENU_MAIN;
     break;
 
