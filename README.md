@@ -7,9 +7,10 @@ SynkinoLC started as a fork of [fwachsmuth/Synkino](https://github.com/fwachsmut
 
 * While the original Synkino relies on two 8-bit ATmega328P microcontrollers (one for the frontend, one for the backend), SynkinoLC makes use of a single 32-bit ARM processor by means of a Teensy microcontroller board.
 * SynkinoLC uses only a few off-the-shelf components to make assembly as straightforward as possible. No SMD soldering is required.
-* The firmware has been optimized to fit the 62K flash of the affordable but powerful Teensy LC microcontroller board (with a few limitations - see below). Teensy 3.2 is also supported.
+* The firmware has been optimized to fit the 62K flash of the affordable but powerful Teensy LC microcontroller board (with a few limitations - see below). Teensy 3.2 is also supported and allows for the full feature-set.
 * Unlike the original Synkino, SynkinoLC is not designed for battery operation. Use any micro-USB phone charger as a power supply unit.
 * When connected to a host via USB you'll have direct access to SynkinoLC's SD card via MTP (Teensy 3.2 only).
+* SD cards can be formatted from SynkinoLC - depending on their size to either FAT16, FAT32, or ExFAT (Teensy 3.2 only).
 * When storing a track numbered 999 (e.g., ```999-24.ogg```) to the SD card, SynkinoLC will automatically begin playing it after start-up.
 
 Most parts of [Friedemann's manual for the original Synkino](https://www.filmkorn.org/synkino-instruction-manual/?lang=en) apply for SynkinoLC as well.
@@ -24,6 +25,7 @@ When assembling SynkinoLC, you can chose between using a Teensy LC or Teensy 3.2
 * The USB stack has been omitted - you can't use debugging by means of USBSerial. You can, however, use the Teensy's HW serial interface (TX on pin 1, 31250 baud).
 * SdFat is running in low-mem mode (no support for exFAT, limited to 32GB cards and 64 character filenames).
 * No MTP access to the SD card.
+* No option for formatting the SD card.
 
 Neither of these limitations should have a significant impact on the usability of SynkinoLC.
 
