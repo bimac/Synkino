@@ -21,6 +21,10 @@ using namespace EncoderTool;
 #include "pins.h"         // pin definitions
 #include "menus.h"        // menu definitions, positions of menu items
 
+#if defined(FORMAT_SD)
+#include "formatSD.h"     // include menu option for formatting SD cards
+#endif
+
 // Use MTP disk?
 #if defined USB_MTPDISK || defined USB_MTPDISK_SERIAL
   #include <SD.h>
@@ -181,6 +185,13 @@ void loop(void) {
     digitalWriteFast(LED_BUILTIN, LOW);
     myState = MENU_MAIN;
     break;
+
+#if defined(FORMAT_SD)
+  case MENU_EXTRAS_FORMAT_SD:
+    formatSD();
+    myState = MENU_MAIN;
+    break;
+#endif
 
   case MENU_EXTRAS_DEL_EEPROM:
     if (ui.userInterfaceMessage("Delete EEPROM", "Are you sure?", "", " Cancel \n Yes ") == 2)
