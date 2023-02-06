@@ -10,7 +10,7 @@ SynkinoLC started as a fork of [fwachsmuth/Synkino](https://github.com/fwachsmut
 * The firmware has been optimized to fit the 62K flash of the Teensy LC microcontroller board (with some limitations), but Teensy 3.2 is also supported and allows for full functionality.
 * Unlike the original Synkino, SynkinoLC is not designed for battery operation. Use any micro-USB phone charger as a power supply unit.
 * When connected to a host via USB, SynkinoLC provides direct access to its SD card through MTP (Teensy 3.2 only).
-*SD cards can be formatted directly from SynkinoLC as either FAT16, FAT32, or ExFAT (Teensy 3.2 only).
+* SD cards can be formatted directly from SynkinoLC as either FAT16, FAT32, or ExFAT (Teensy 3.2 only).
 * Storing a track numbered 999 (e.g. "999-24.ogg") to the SD card will cause SynkinoLC to automatically start playing it after startup.
 
 Most parts of [Friedemann's manual for the original Synkino](https://www.filmkorn.org/synkino-instruction-manual/?lang=en) apply for SynkinoLC as well.
