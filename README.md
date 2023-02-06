@@ -5,20 +5,20 @@ Allows sound playback synchronised to a running, jittery Super 8 projector.
 
 SynkinoLC started as a fork of [fwachsmuth/Synkino](https://github.com/fwachsmuth/Synkino) with the following changes:
 
-* While the original Synkino relies on two 8-bit ATmega328P microcontrollers (one for the frontend, one for the backend), SynkinoLC makes use of a single 32-bit ARM processor by means of a Teensy microcontroller board.
-* SynkinoLC uses only a few off-the-shelf components to make assembly as straightforward as possible. No SMD soldering is required.
-* The firmware has been optimized to fit the 62K flash of the affordable but powerful Teensy LC microcontroller board (with a few limitations - see below). Teensy 3.2 is also supported and allows for the full feature-set.
+* While the original Synkino utilized two 8-bit ATmega328P microcontrollers (one for the frontend and one for the backend) SynkinoLC incorporates a single, more powerful 32-bit ARM processor through the use of a Teensy microcontroller board.
+* Assembly of SynkinoLC is made simple with only a few off-the-shelf components and no SMD soldering required.
+* The firmware has been optimized to fit the 62K flash of the Teensy LC microcontroller board (with some limitations), but Teensy 3.2 is also supported and allows for full functionality.
 * Unlike the original Synkino, SynkinoLC is not designed for battery operation. Use any micro-USB phone charger as a power supply unit.
-* When connected to a host via USB you'll have direct access to SynkinoLC's SD card via MTP (Teensy 3.2 only).
-* SD cards can be formatted directly from SynkinoLC - depending on their size to either FAT16, FAT32, or ExFAT (Teensy 3.2 only).
-* When storing a track numbered 999 (e.g., ```999-24.ogg```) to the SD card, SynkinoLC will automatically begin playing it after start-up.
+* When connected to a host via USB, SynkinoLC provides direct access to its SD card through MTP (Teensy 3.2 only).
+*SD cards can be formatted directly from SynkinoLC as either FAT16, FAT32, or ExFAT (Teensy 3.2 only).
+* Storing a track numbered 999 (e.g. "999-24.ogg") to the SD card will cause SynkinoLC to automatically start playing it after startup.
 
 Most parts of [Friedemann's manual for the original Synkino](https://www.filmkorn.org/synkino-instruction-manual/?lang=en) apply for SynkinoLC as well.
 
 
 ## Teensy LC vs Teensy 3.2
 
-When assembling SynkinoLC, you can chose between using a Teensy LC or Teensy 3.2 microcontroller board. As of writing, however, Teensy 3.2 microcontrollers are not available for purchase due to the global chip shortage. While Teensy LC has more than enough processing power for SynkinoLC, it comes with a few minor limitations that are linked to its smaller flash of only 62K (vs 256K on Teensy 3.2):
+When building SynkinoLC, you have the option to use either a Teensy LC or Teensy 3.2 microcontroller board. However, as of the time of writing, Teensy 3.2 microcontrollers are unavailable for purchase due to the current global chip shortage. Although the Teensy LC provides ample processing power for SynkinoLC, it has a few minor limitations related to its smaller flash memory of only 62K (compared to 256K on the Teensy 3.2):
 
 * The binary patch file for the VS1053b audio decoder (```patches.053```) cannot be included with the firmware and needs to be supplied by means of the microSD-card.
 * You can store settings for "only" 7 projectors (vs 15 on Teensy 3.2).
